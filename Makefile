@@ -1,13 +1,12 @@
-CC      = gcc
+CC      = g++
 CFLAGS  = -g
-RM      = rm -f
 
 default: all
 
 all: client
 
-client: client.c
-	$(CC) $(CFLAGS) -o client client.c
+client: client.cpp commands.h
+	$(CC) $(CFLAGS) -o client client.cpp
 
 clean:
 	$(RM) client
