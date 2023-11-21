@@ -131,3 +131,68 @@ optional<User> login_command(vector<string> &args, int fd, struct addrinfo *res)
     }
     return {};
 }
+
+
+/*
+logout –  the  User  application  sends  a  message  to  the  AS,  using  the  UDP 
+protocol, asking to logout the currently logged in user, with ID UID.  
+The result of the request should be displayed: successful logout, unknown user, 
+or user not logged in.
+
+LOU UID password 
+Following the logout command the User application informs the AS that the 
+currently logged in user, with ID UID, wants to logout.  
+d)  RLO status 
+In reply to a LOU request the AS checks if a user with ID UID is logged in. If so, 
+the user is logged out and the reply status is OK. If the user was not logged in 
+the  reply  status  is  NOK.  If  the  user  was  not  registered  the  reply  status  is 
+UNR.   
+*/
+
+void logout_command(vector<string> &args, int fd, struct addrinfo *res, optional<User> &user) {
+    if (args.size() != 0) {
+        cerr << "Invalid number of args for logout command." << std::endl;
+        return;
+    }
+
+    if (!user) {
+        cerr << "You must be logged in to logout." << endl;
+        return;
+    }
+
+    // send logout request to AS
+    // Send a message to the server
+    auto message = "LOU " + user->uid + " " + user->password + "\n";
+    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
+                    res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        exit(1);
+    }
+
+    // Receive a message from the server
+    char buffer[128];
+    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error receiving message from AS." << endl;
+        exit(1);
+    }
+
+    Response response = parse_response(buffer);
+
+    if (response.type != "RLO") {
+        cerr << "Unexpected response type: " << response.type << endl;
+        return;
+    }
+
+    if (response.status == OK) {
+        cout << "successful logout" << endl;
+        user = {};
+    } else if (response.status == NOK) {
+        cout << "user not logged in" << endl;
+    } else if (response.status == UNR) {
+        cout << "unknown user" << endl;
+    } else {
+        cerr << "Unexpected response status: " << response.status << endl;
+    }
+}
