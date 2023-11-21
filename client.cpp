@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in addr;
     char buffer[128];
 
-    optional <User> user = {};
+    optional<User> user = {};
 
     // Create a UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -101,14 +101,13 @@ int main(int argc, char *argv[]) {
 
         cout << "Command: " << cmd.name << endl;
         if (cmd.name == "login") {
-            cout << "login" << endl;
-            user = login_command(cmd.args, fd, res);
+            user = login(cmd.args, fd, res);
         } else if (cmd.name == "list") {
-            cout << "list" << endl;
             // list_command(buffer, fd, res);
         } else if (cmd.name == "logout") {
-            cout << "logout" << endl;
-            logout_command(cmd.args, fd, res, user);
+            logout(cmd.args, fd, res, user);
+        } else if (cmd.name == "unregister") {
+            unregister(cmd.args, fd, res, user);
         } else {
             cout << "Unknown command." << endl;
         }

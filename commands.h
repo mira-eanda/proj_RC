@@ -2,6 +2,7 @@
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <optional>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
-#include <optional>
 
 using namespace std;
 
@@ -42,9 +42,14 @@ struct User {
     string password;
 };
 
-Response parse_response(const string &response) {
+optional<Response> parse_response(const string &response, const string type) {
     Response r;
     r.type = response.substr(0, 3);
+
+    if (r.type != type) {
+        cerr << "Unexpected response type: " << r.type << endl;
+        return {};
+    }
     if (response[4] == 'O') {
         r.status = OK;
     } else if (response[4] == 'N') {
@@ -54,8 +59,8 @@ Response parse_response(const string &response) {
     } else if (response[4] == 'U') {
         r.status = UNR;
     } else {
-        cerr << "Invalid response status: " << response << endl;
-        exit(1);
+        cerr << "Invalid response: " << response << endl;
+        return {};
     }
 
     return r;
@@ -65,7 +70,7 @@ constexpr auto numeric = "0123456789";
 constexpr auto alphanumeric =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
-optional<User> login_command(vector<string> &args, int fd, struct addrinfo *res) {
+optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
     if (args.size() != 2) {
         cerr << "Invalid number of args for login command." << std::endl;
         return {};
@@ -112,28 +117,28 @@ optional<User> login_command(vector<string> &args, int fd, struct addrinfo *res)
         exit(1);
     }
 
-    Response response = parse_response(buffer);
-
-    if (response.type != "RLI") {
-        cerr << "Unexpected response type: " << response.type << endl;
+    auto response = parse_response(buffer, "RLI");
+    if (!response) {
         return {};
     }
+    auto status = response->status;
 
-    if (response.status == OK) {
+    if (status == OK) {
         cout << "successful login" << endl;
         return User{uid, password};
-    } else if (response.status == NOK) {
+    } else if (status == NOK) {
         cout << "incorrect login" << endl;
-    } else if (response.status == REG) {
+    } else if (status == REG) {
         cout << "new user registered" << endl;
+        return User{uid, password};
     } else {
-        cerr << "Unexpected response status: " << response.status << endl;
+        cerr << "Unexpected response status: " << status << endl;
     }
     return {};
 }
 
-
-void logout_command(vector<string> &args, int fd, struct addrinfo *res, optional<User> &user) {
+void logout(vector<string> &args, int fd, struct addrinfo *res,
+            optional<User> &user) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for logout command." << std::endl;
         return;
@@ -162,21 +167,68 @@ void logout_command(vector<string> &args, int fd, struct addrinfo *res, optional
         exit(1);
     }
 
-    Response response = parse_response(buffer);
+    auto response = parse_response(buffer, "RLO");
+    if (!response) {
+        return;
+    }
+    auto status = response->status;
 
-    if (response.type != "RLO") {
-        cerr << "Unexpected response type: " << response.type << endl;
+    if (status == OK) {
+        cout << "successful logout" << endl;
+        user = {};
+    } else if (status == NOK) {
+        cout << "user not logged in" << endl;
+    } else if (status == UNR) {
+        cout << "unknown user" << endl;
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    }
+}
+
+void unregister(vector<string> &args, int fd, struct addrinfo *res,
+                optional<User> &user) {
+    if (args.size() != 0) {
+        cerr << "Invalid number of args for unregister command." << std::endl;
         return;
     }
 
-    if (response.status == OK) {
-        cout << "successful logout" << endl;
+    if (!user) {
+        cerr << "You must be logged in to unregister." << endl;
+        return;
+    }
+
+    // send unregister request to AS
+    // Send a message to the server
+    auto message = "UNR " + user->uid + " " + user->password + "\n";
+    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
+                    res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        exit(1);
+    }
+
+    // Receive a message from the server
+    char buffer[128];
+    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error receiving message from AS." << endl;
+        exit(1);
+    }
+
+    auto response = parse_response(buffer, "RUR");
+    if (!response) {
+        return;
+    }
+    auto status = response->status;
+
+    if (status == OK) {
+        cout << "successful unregister" << endl;
         user = {};
-    } else if (response.status == NOK) {
+    } else if (status == NOK) {
         cout << "user not logged in" << endl;
-    } else if (response.status == UNR) {
+    } else if (status == UNR) {
         cout << "unknown user" << endl;
     } else {
-        cerr << "Unexpected response status: " << response.status << endl;
+        cerr << "Unexpected response status: " << status << endl;
     }
 }
