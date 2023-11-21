@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
         cout << "Command: " << cmd.name << endl;
         if (cmd.name == "login") {
             user = login(cmd.args, fd, res);
-        } else if (cmd.name == "list") {
+        } else if (cmd.name == "list" || cmd.name == "l") {
             list_command(cmd.args, fd, res);
         } else if (cmd.name == "logout") {
             logout(cmd.args, fd, res, user);

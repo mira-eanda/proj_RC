@@ -42,6 +42,11 @@ struct User {
     string password;
 };
 
+struct Auction {
+    int AID;
+    int state;
+};
+
 optional<Response> parse_response(const string &response, const string type) {
     Response r;
     r.type = response.substr(0, 3);
@@ -233,7 +238,16 @@ void unregister(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
-
+void show_active_auctions(char *buffer) {
+    
+    std::istringstream iss(buffer);
+    int AID, state;
+    while (iss >> AID >> state) {
+        if (state == 1) {
+            std::cout << AID << " - active\n";
+        }
+    }
+}
 
 void list_command(vector<string> &args, int fd, struct addrinfo *res) {
     if (args.size() != 0) {
@@ -262,13 +276,14 @@ void list_command(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     auto status = response->status;
+    cout << "status: " << status << endl;
 
     if (status == NOK) {
         cout << "no auctions are currently active" << endl;
     } else if (status == OK) {
-        cout << "active auctions: " << endl;
-        
-        cout << buffer + 6 << endl;
+        cout << "List of auctions: " << endl;
+        show_active_auctions(buffer + 7);
+        // cout << buffer + 7 << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;
     }
@@ -288,3 +303,4 @@ void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
     cout << "Exiting..." << endl;
     exit(0);
 }
+
