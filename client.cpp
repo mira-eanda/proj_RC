@@ -108,6 +108,8 @@ int main(int argc, char *argv[]) {
             logout(cmd.args, fd, res, user);
         } else if (cmd.name == "unregister") {
             unregister(cmd.args, fd, res, user);
+        } else if (cmd.name == "exit") {
+            exit_cli(cmd.args, fd, res, user);
         } else {
             cout << "Unknown command." << endl;
         }

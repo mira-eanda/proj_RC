@@ -232,3 +232,18 @@ void unregister(vector<string> &args, int fd, struct addrinfo *res,
         cerr << "Unexpected response status: " << status << endl;
     }
 }
+
+void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
+          optional<User> &user) {
+    if (args.size() != 0) {
+        cerr << "Invalid number of args for exit command." << std::endl;
+        return;
+    }
+
+    if (user) {
+        logout(args, fd, res, user);
+    }
+
+    cout << "Exiting..." << endl;
+    exit(0);
+}
