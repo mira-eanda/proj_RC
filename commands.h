@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include <optional>
 
 using namespace std;
 
@@ -36,6 +37,11 @@ struct Response {
     status_t status;
 };
 
+struct User {
+    string uid;
+    string password;
+};
+
 Response parse_response(const string &response) {
     Response r;
     r.type = response.substr(0, 3);
@@ -59,10 +65,10 @@ constexpr auto numeric = "0123456789";
 constexpr auto alphanumeric =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
-void login_command(vector<string> &args, int fd, struct addrinfo *res) {
+optional<User> login_command(vector<string> &args, int fd, struct addrinfo *res) {
     if (args.size() != 2) {
         cerr << "Invalid number of args for login command." << std::endl;
-        return;
+        return {};
     }
 
     auto uid = args[0];
@@ -70,22 +76,22 @@ void login_command(vector<string> &args, int fd, struct addrinfo *res) {
 
     if (uid.size() != MAX_UID) {
         cerr << "UID must be " << MAX_UID << " characters long." << endl;
-        return;
+        return {};
     }
     if (password.size() != MAX_PASSWORD) {
         cerr << "Password must be " << MAX_PASSWORD << " characters long."
              << endl;
-        return;
+        return {};
     }
 
     if (uid.find_first_not_of(numeric) != string::npos) {
         cerr << "UID must be numeric." << endl;
-        return;
+        return {};
     }
 
     if (password.find_first_not_of(alphanumeric) != string::npos) {
         cerr << "Password must be alphanumeric." << endl;
-        return;
+        return {};
     }
 
     // send login request to AS
@@ -110,17 +116,18 @@ void login_command(vector<string> &args, int fd, struct addrinfo *res) {
 
     if (response.type != "RLI") {
         cerr << "Unexpected response type: " << response.type << endl;
-        return;
+        return {};
     }
 
     if (response.status == OK) {
         cout << "successful login" << endl;
+        return User{uid, password};
     } else if (response.status == NOK) {
         cout << "incorrect login" << endl;
     } else if (response.status == REG) {
         cout << "new user registered" << endl;
     } else {
         cerr << "Unexpected response status: " << response.status << endl;
-        return;
     }
+    return {};
 }
