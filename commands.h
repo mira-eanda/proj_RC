@@ -29,7 +29,7 @@ login attempt or, in case the UID was not present at the AS, register a new
 user.
 */
 
-enum status_t { OK, NOK };
+enum status_t { OK, NOK, REG, UNR };
 
 struct Response {
     string type;
@@ -39,7 +39,19 @@ struct Response {
 Response parse_response(const string &response) {
     Response r;
     r.type = response.substr(0, 3);
-    r.status = response.substr(4, 3) == "OK" ? OK : NOK;
+    if (response[4] == 'O') {
+        r.status = OK;
+    } else if (response[4] == 'N') {
+        r.status = NOK;
+    } else if (response[4] == 'R') {
+        r.status = REG;
+    } else if (response[4] == 'U') {
+        r.status = UNR;
+    } else {
+        cerr << "Invalid response status: " << response << endl;
+        exit(1);
+    }
+
     return r;
 }
 
@@ -95,6 +107,7 @@ void login_command(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     Response response = parse_response(buffer);
+
     if (response.type != "RLI") {
         cerr << "Unexpected response type: " << response.type << endl;
         return;
@@ -102,7 +115,12 @@ void login_command(vector<string> &args, int fd, struct addrinfo *res) {
 
     if (response.status == OK) {
         cout << "successful login" << endl;
-    } else {
+    } else if (response.status == NOK) {
         cout << "incorrect login" << endl;
+    } else if (response.status == REG) {
+        cout << "new user registered" << endl;
+    } else {
+        cerr << "Unexpected response status: " << response.status << endl;
+        return;
     }
 }
