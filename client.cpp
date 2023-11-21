@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         if (cmd.name == "login") {
             user = login(cmd.args, fd, res);
         } else if (cmd.name == "list") {
-            // list_command(buffer, fd, res);
+            list_command(cmd.args, fd, res);
         } else if (cmd.name == "logout") {
             logout(cmd.args, fd, res, user);
         } else if (cmd.name == "unregister") {
