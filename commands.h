@@ -133,22 +133,6 @@ optional<User> login_command(vector<string> &args, int fd, struct addrinfo *res)
 }
 
 
-/*
-logout –  the  User  application  sends  a  message  to  the  AS,  using  the  UDP 
-protocol, asking to logout the currently logged in user, with ID UID.  
-The result of the request should be displayed: successful logout, unknown user, 
-or user not logged in.
-
-LOU UID password 
-Following the logout command the User application informs the AS that the 
-currently logged in user, with ID UID, wants to logout.  
-d)  RLO status 
-In reply to a LOU request the AS checks if a user with ID UID is logged in. If so, 
-the user is logged out and the reply status is OK. If the user was not logged in 
-the  reply  status  is  NOK.  If  the  user  was  not  registered  the  reply  status  is 
-UNR.   
-*/
-
 void logout_command(vector<string> &args, int fd, struct addrinfo *res, optional<User> &user) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for logout command." << std::endl;
