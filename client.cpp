@@ -99,11 +99,12 @@ int main(int argc, char *argv[]) {
 
         auto cmd = parse_command(buffer);
 
-        cout << "Command: " << cmd.name << endl;
         if (cmd.name == "login") {
             user = login(cmd.args, fd, res);
         } else if (cmd.name == "list" || cmd.name == "l") {
-            list_command(cmd.args, fd, res);
+            list(cmd.args, fd, res);
+        } else if (cmd.name == "myauctions" || cmd.name == "ma") {
+            list_my_auctions(cmd.args, fd, res, user);
         } else if (cmd.name == "logout") {
             logout(cmd.args, fd, res, user);
         } else if (cmd.name == "unregister") {

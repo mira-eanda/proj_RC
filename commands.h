@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <optional>
 #include <stdio.h>
+#include <sstream>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -249,7 +250,7 @@ void show_active_auctions(char *buffer) {
     }
 }
 
-void list_command(vector<string> &args, int fd, struct addrinfo *res) {
+void list(vector<string> &args, int fd, struct addrinfo *res) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for logout command." << std::endl;
         return;
@@ -271,6 +272,51 @@ void list_command(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     auto response = parse_response(buffer, "RLS");
+    if (!response) {
+        return;
+    }
+
+    auto status = response->status;
+    cout << "status: " << status << endl;
+
+    if (status == NOK) {
+        cout << "no auctions are currently active" << endl;
+    } else if (status == OK) {
+        cout << "List of auctions: " << endl;
+        show_active_auctions(buffer + 7);
+        // cout << buffer + 7 << endl;
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    }
+}
+
+void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res, optional<User> &user) {
+    if (args.size() != 0) {
+        cerr << "Invalid number of args for logout command." << std::endl;
+        return;
+    }
+
+    if (!user) {
+        cerr << "You must be logged in to list your auctions." << endl;
+        return;
+    }
+
+    auto message = "LMA " + user->uid + "\n";
+    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr, res->ai_addrlen);
+
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        exit(1);
+    }
+    // Receive a message from the server
+    char buffer[128];
+    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error receiving message from AS." << endl;
+        exit(1);
+    }
+
+    auto response = parse_response(buffer, "RMA");
     if (!response) {
         return;
     }
