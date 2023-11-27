@@ -3,8 +3,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <optional>
-#include <stdio.h>
 #include <sstream>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string>
@@ -36,6 +36,7 @@ enum status_t { OK, NOK, REG, UNR };
 struct Response {
     string type;
     status_t status;
+    string message;
 };
 
 struct User {
@@ -68,6 +69,8 @@ optional<Response> parse_response(const string &response, const string type) {
         cerr << "Invalid response: " << response << endl;
         return {};
     }
+
+    r.message = response.substr(6);
 
     return r;
 }
@@ -239,13 +242,25 @@ void unregister(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
-void show_active_auctions(char *buffer) {
-    
+vector<Auction> parse_listed_auctions(const string &buffer) {
+    vector<Auction> auctions;
     std::istringstream iss(buffer);
     int AID, state;
     while (iss >> AID >> state) {
-        if (state == 1) {
-            std::cout << AID << " - active\n";
+        auctions.push_back({AID, state});
+    }
+    return auctions;
+}
+
+void print_auctions(const vector<Auction> &auctions) {
+    if (auctions.size() == 0) {
+        cout << "no auctions are currently active" << endl;
+        return;
+    }
+    for (auto auction : auctions) {
+        cout << auction.AID << " - ";
+        if (auction.state == 1) {
+            cout << "active" << endl;
         }
     }
 }
@@ -257,7 +272,8 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     auto message = "LST\n";
-    auto n = sendto(fd, message, strlen(message), 0, res->ai_addr, res->ai_addrlen);
+    auto n =
+        sendto(fd, message, strlen(message), 0, res->ai_addr, res->ai_addrlen);
 
     if (n == -1) {
         cerr << "Error sending message to AS." << endl;
@@ -270,6 +286,7 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
         cerr << "Error receiving message from AS." << endl;
         exit(1);
     }
+    cout << buffer << endl;
 
     auto response = parse_response(buffer, "RLS");
     if (!response) {
@@ -282,15 +299,15 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
     if (status == NOK) {
         cout << "no auctions are currently active" << endl;
     } else if (status == OK) {
-        cout << "List of auctions: " << endl;
-        show_active_auctions(buffer + 7);
-        // cout << buffer + 7 << endl;
+        auto auctions = parse_listed_auctions(response->message);
+        print_auctions(auctions);
     } else {
         cerr << "Unexpected response status: " << status << endl;
     }
 }
 
-void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res, optional<User> &user) {
+void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
+                      optional<User> &user) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for logout command." << std::endl;
         return;
@@ -302,7 +319,8 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res, option
     }
 
     auto message = "LMA " + user->uid + "\n";
-    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr, res->ai_addrlen);
+    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
+                    res->ai_addrlen);
 
     if (n == -1) {
         cerr << "Error sending message to AS." << endl;
@@ -327,8 +345,7 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res, option
     if (status == NOK) {
         cout << "no auctions are currently active" << endl;
     } else if (status == OK) {
-        cout << "List of auctions: " << endl;
-        show_active_auctions(buffer + 7);
+        auto auctions = parse_listed_auctions(response->message);
         // cout << buffer + 7 << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;
@@ -336,7 +353,7 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res, option
 }
 
 void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
-          optional<User> &user) {
+              optional<User> &user) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for exit command." << std::endl;
         return;
@@ -349,4 +366,3 @@ void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
     cout << "Exiting..." << endl;
     exit(0);
 }
-
