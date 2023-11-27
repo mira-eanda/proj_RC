@@ -258,9 +258,8 @@ void print_auctions(const vector<Auction> &auctions) {
         return;
     }
     for (auto auction : auctions) {
-        cout << auction.AID << " - ";
         if (auction.state == 1) {
-            cout << "active" << endl;
+            cout << auction.AID << " - " << "active" << endl;
         }
     }
 }
