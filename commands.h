@@ -275,9 +275,95 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
+struct BidInfo {
+    int bidder_UID;
+    int bid_value;
+    string bid_date_time;
+    int bid_sec_time;
+};
+
+struct EndInfo {
+    string end_date_time;
+    int end_sec_time;
+};
+
+struct AuctionInfo {
+    int host_UID;
+    string auction_name;
+    string asset_fname;
+    int start_value;
+    string start_date_time;
+    int timeactive;
+    vector<BidInfo> bids;
+    optional<EndInfo> end;
+};
+
+optional<AuctionInfo> parse_auction_info(const string &buffer) {
+    AuctionInfo info;
+    std::istringstream iss(buffer);
+    iss >> info.host_UID >> info.auction_name >> info.asset_fname >>
+        info.start_value >> info.start_date_time >> info.timeactive;
+
+    string bid;
+    while (iss >> bid) {
+        if (bid == "E") {
+            EndInfo end;
+            iss >> end.end_date_time >> end.end_sec_time;
+            info.end = end;
+            break;
+        } else {
+            BidInfo bid_info;
+            iss >> bid_info.bidder_UID >> bid_info.bid_value >>
+                bid_info.bid_date_time >> bid_info.bid_sec_time;
+            info.bids.push_back(bid_info);
+        }
+    }
+
+    return info;
+}
+
 void show_record(vector<string> &args, int fd, struct addrinfo *res) {
     if (!validate_args(args, 1)) {
         return;
+    }
+    auto aid = args[0];
+
+    auto message = "SRC " + aid + "\n";
+    auto response = send_command(message, fd, res, "RRC");
+    if (!response) {
+        return;
+    }
+    auto status = response->status;
+
+    if (status == NOK) {
+        cout << "auction not found" << endl;
+    } else if (status == OK) {
+        auto info = parse_auction_info(response->message);
+        if (!info) {
+            cerr << "Error parsing auction info." << endl;
+            return;
+        }
+        cout << "--- Auction #" << aid << " ---" << endl;
+
+        cout << "host_UID: " << info->host_UID << endl;
+        cout << "auction_name: " << info->auction_name << endl;
+        cout << "asset_fname: " << info->asset_fname << endl;
+        cout << "start_value: " << info->start_value << endl;
+        cout << "start_date_time: " << info->start_date_time << endl;
+        cout << "timeactive: " << info->timeactive << endl;
+        if (info->end) {
+            cout << "end_date_time: " << info->end->end_date_time << endl;
+            cout << "end_sec_time: " << info->end->end_sec_time << endl;
+        }
+        for (auto bid : info->bids) {
+            cout << "--- Bid info ---" << endl;
+            cout << "bidder_UID: " << bid.bidder_UID << endl;
+            cout << "bid_value: " << bid.bid_value << endl;
+            cout << "bid_date_time: " << bid.bid_date_time << endl;
+            cout << "bid_sec_time: " << bid.bid_sec_time << endl;
+        }
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
     }
 }
 
