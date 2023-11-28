@@ -61,18 +61,16 @@ int main(int argc, char *argv[]) {
 
     auto args = parse_arguments(argc, argv);
 
-    int fd, errcode;
-    ssize_t n;
-    socklen_t addrlen;
-    struct addrinfo hints, *res;
-    struct sockaddr_in addr;
+    int errcode;
+    struct addrinfo hints;
     char buffer[128];
+    Connections connections;
 
     optional<User> user = {};
 
     // Create a UDP socket
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd == -1)
+    connections.tcp.fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (connections.tcp.fd == -1)
         exit(1);
 
     // Configure server address
@@ -80,10 +78,10 @@ int main(int argc, char *argv[]) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
-    cout << "Connecting to server..." << endl;
+    cout << "Connecting to UDP server..." << endl;
 
     // Use getaddrinfo to obtain address information
-    errcode = getaddrinfo(args.ASIP, args.ASport, &hints, &res);
+    errcode = getaddrinfo(args.ASIP, args.ASport, &hints, &connections.udp.addr);
     if (errcode != 0) {
         cerr << "An error occured: " << gai_strerror(errcode) << endl;
         exit(1);
@@ -100,21 +98,21 @@ int main(int argc, char *argv[]) {
         auto cmd = parse_command(buffer);
 
         if (cmd.name == "login") {
-            user = login(cmd.args, fd, res);
+            user = login(cmd.args, connections);
         } else if (cmd.name == "list" || cmd.name == "l") {
-            list(cmd.args, fd, res);
+            list(cmd.args, connections);
         } else if (cmd.name == "myauctions" || cmd.name == "ma") {
-            list_my_auctions(cmd.args, fd, res, user);
+            list_my_auctions(cmd.args, connections, user);
         } else if (cmd.name == "show_record" || cmd.name == "sr") {
-            show_record(cmd.args, fd, res);
+            show_record(cmd.args, connections);
         } else if (cmd.name == "mybids" || cmd.name == "mb") {
-            my_bids(cmd.args, fd, res, user);
+            my_bids(cmd.args, connections, user);
         } else if (cmd.name == "logout") {
-            logout(cmd.args, fd, res, user);
+            logout(cmd.args, connections, user);
         } else if (cmd.name == "unregister") {
-            unregister(cmd.args, fd, res, user);
+            unregister(cmd.args, connections, user);
         } else if (cmd.name == "exit") {
-            exit_cli(cmd.args, fd, res, user);
+            exit_cli(cmd.args, connections, user);
         } else {
             cout << "Unknown command." << endl;
         }

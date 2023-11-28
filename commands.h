@@ -15,10 +15,25 @@
 
 using namespace std;
 
+struct UDPConnection {
+    int fd;
+    struct sockaddr_in* addr;
+};
+
+struct TCPConnection {
+    int fd;
+    struct sockaddr_in addr;
+};
+
+struct Connections {
+    UDPConnection udp;
+    TCPConnection tcp;
+};
+
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-enum status_t { OK, NOK, REG, UNR, NLG};
+enum status_t { OK, NOK, REG, UNR, NLG };
 
 struct Response {
     string type;
@@ -82,17 +97,16 @@ optional<Response> parse_response(const string &response, const string type) {
     return r;
 }
 
-optional<Response> send_command(const string &command, int fd,
-                                struct addrinfo *res, const string &type) {
-    auto n = sendto(fd, command.c_str(), command.size(), 0, res->ai_addr,
-                    res->ai_addrlen);
+optional<Response> send_command(const string &command, Connections conns, const string &type) {
+    auto n = sendto(conns.udp.fd, command.c_str(), command.size(), 0, conns.udp.addr->ai_addr,
+                    conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error sending message to AS." << endl;
         exit(1);
     }
 
     char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
+    n = recvfrom(conns.udp.fd, buffer, 128, 0, conns.udp.addr->ai_addr, &conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error receiving message from AS." << endl;
         exit(1);
@@ -105,7 +119,7 @@ constexpr auto numeric = "0123456789";
 constexpr auto alphanumeric =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
-optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
+optional<User> login(vector<string> &args, Connections conns,) {
     if (!validate_args(args, 2)) {
         return {};
     }
@@ -134,7 +148,7 @@ optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     auto message = "LIN " + uid + " " + password + "\n";
-    auto response = send_command(message, fd, res, "RLI");
+    auto response = send_command(message, conns, "RLI");
     if (!response) {
         return {};
     }
@@ -154,14 +168,14 @@ optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
     return {};
 }
 
-void logout(vector<string> &args, int fd, struct addrinfo *res,
+void logout(vector<string> &args, Connections conns,
             optional<User> &user) {
     if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
     auto message = "LOU " + user->uid + " " + user->password + "\n";
-    auto response = send_command(message, fd, res, "RLO");
+    auto response = send_command(message, conns, "RLO");
     if (!response) {
         return;
     }
@@ -179,14 +193,14 @@ void logout(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
-void unregister(vector<string> &args, int fd, struct addrinfo *res,
+void unregister(vector<string> &args, Connections conns,
                 optional<User> &user) {
     if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
     auto message = "UNR " + user->uid + " " + user->password + "\n";
-    auto response = send_command(message, fd, res, "RUR");
+    auto response = send_command(message, conns, "RUR");
     if (!response) {
         return;
     }
@@ -233,13 +247,13 @@ void print_auctions(const vector<Auction> &auctions) {
     }
 }
 
-void list(vector<string> &args, int fd, struct addrinfo *res) {
+void list(vector<string> &args, Connections conns) {
     if (!validate_args(args, 0)) {
         return;
     }
 
     auto message = "LST\n";
-    auto response = send_command(message, fd, res, "RLS");
+    auto response = send_command(message, conns, "RLS");
     if (!response) {
         return;
     }
@@ -255,14 +269,14 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
     }
 }
 
-void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
+void list_my_auctions(vector<string> &args, Connections conns,
                       optional<User> &user) {
     if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
     auto message = "LMA " + user->uid + "\n";
-    auto response = send_command(message, fd, res, "RMA");
+    auto response = send_command(message, conns, "RMA");
     if (!response) {
         return;
     }
@@ -327,14 +341,14 @@ optional<AuctionInfo> parse_auction_info(const string &buffer) {
     return info;
 }
 
-void show_record(vector<string> &args, int fd, struct addrinfo *res) {
+void show_record(vector<string> &args, Connections conns) {
     if (!validate_args(args, 1)) {
         return;
     }
     auto aid = args[0];
 
     auto message = "SRC " + aid + "\n";
-    auto response = send_command(message, fd, res, "RRC");
+    auto response = send_command(message, conns, "RRC");
     if (!response) {
         return;
     }
@@ -372,9 +386,8 @@ void show_record(vector<string> &args, int fd, struct addrinfo *res) {
     }
 }
 
-
-void my_bids(vector<string> &args, int fd, struct addrinfo *res,
-              optional<User> &user) {
+void my_bids(vector<string> &args, Connections conns,
+             optional<User> &user) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for logout command." << std::endl;
         return;
@@ -386,7 +399,7 @@ void my_bids(vector<string> &args, int fd, struct addrinfo *res,
     }
 
     auto message = "LMB " + user->uid + "\n";
-    auto response = send_command(message, fd, res, "RMB");
+    auto response = send_command(message, conns, "RMB");
     if (!response) {
         return;
     }
@@ -395,7 +408,7 @@ void my_bids(vector<string> &args, int fd, struct addrinfo *res,
 
     if (status == NOK) {
         cout << "no ongoing bids" << endl;
-    } else if (status == NLG) { 
+    } else if (status == NLG) {
         cout << "user not logged in" << endl;
     } else if (status == OK) {
         auto auctions = parse_listed_auctions(response->message);
@@ -405,14 +418,14 @@ void my_bids(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
-void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
+void exit_cli(vector<string> &args, Connections conns,
               optional<User> &user) {
     if (!validate_args(args, 0)) {
         return;
     }
 
     if (user) {
-        logout(args, fd, res, user);
+        logout(args, conns, user);
     }
 
     cout << "Exiting..." << endl;
