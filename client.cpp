@@ -81,7 +81,8 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_DGRAM;
 
     // Use getaddrinfo to obtain address information
-    errcode = getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.udp.addr));
+    errcode =
+        getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.udp.addr));
     if (errcode != 0) {
         cerr << "An error occured: " << gai_strerror(errcode) << endl;
         exit(1);
@@ -89,18 +90,14 @@ int main(int argc, char *argv[]) {
 
     cout << "Connecting to TCP server..." << endl;
 
-    // Create a TCP socket
-    connections.tcp.fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (connections.tcp.fd == -1)
-        exit(1);
-
     // Configure tcp server address
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM; 
+    hints.ai_socktype = SOCK_STREAM;
 
     // Use getaddrinfo to obtain address information
-    errcode = getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.tcp.addr));
+    errcode =
+        getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.tcp.addr));
     if (errcode != 0) {
         cerr << "An error occured: " << gai_strerror(errcode) << endl;
         exit(1);
@@ -124,6 +121,8 @@ int main(int argc, char *argv[]) {
             list_my_auctions(cmd.args, connections, user);
         } else if (cmd.name == "show_record" || cmd.name == "sr") {
             show_record(cmd.args, connections);
+        } else if (cmd.name == "show_asset" || cmd.name == "sa") {
+            show_asset(cmd.args, connections);
         } else if (cmd.name == "mybids" || cmd.name == "mb") {
             my_bids(cmd.args, connections, user);
         } else if (cmd.name == "logout") {
@@ -138,6 +137,7 @@ int main(int argc, char *argv[]) {
     }
 
     freeaddrinfo(connections.udp.addr);
+    freeaddrinfo(connections.tcp.addr);
     close(connections.udp.fd);
 
     return 0;

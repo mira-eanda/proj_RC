@@ -1,4 +1,6 @@
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <fstream>
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -17,12 +19,11 @@ using namespace std;
 
 struct UDPConnection {
     int fd;
-    struct addrinfo* addr;
+    struct addrinfo *addr;
 };
 
 struct TCPConnection {
-    int fd;
-    struct addrinfo* addr;
+    struct addrinfo *addr;
 };
 
 struct Connections {
@@ -98,7 +99,7 @@ optional<Response> parse_response(const string &response, const string type) {
 }
 
 optional<Response> send_udp_command(const string &command, Connections conns,
-                                const string &type) {
+                                    const string &type) {
     auto n = sendto(conns.udp.fd, command.c_str(), command.size(), 0,
                     conns.udp.addr->ai_addr, conns.udp.addr->ai_addrlen);
     if (n == -1) {
@@ -116,6 +117,45 @@ optional<Response> send_udp_command(const string &command, Connections conns,
     }
 
     return parse_response(buffer, type);
+}
+
+optional<Response> send_tcp_command(const string &command, Connections conns,
+                                    const string &type) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1)
+        exit(1);
+
+    auto n = connect(fd, conns.tcp.addr->ai_addr, conns.tcp.addr->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error connecting to AS." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+        return {};
+    }
+
+    n = write(fd, command.c_str(), command.size());
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+        return {};
+    }
+
+    string data;
+    char buffer[128];
+    while (true) {
+        n = read(fd, buffer, 128);
+        if (n == -1) {
+            cerr << "Error receiving message from AS." << endl;
+            return {};
+        }
+        if (n == 0) {
+            break;
+        }
+        data += string(buffer, n);
+    }
+
+    close(fd);
+
+    return parse_response(data, type);
 }
 
 constexpr auto numeric = "0123456789";
@@ -387,14 +427,55 @@ void show_record(vector<string> &args, Connections conns) {
     }
 }
 
-void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
-    if (args.size() != 0) {
-        cerr << "Invalid number of args for logout command." << std::endl;
+struct Asset {
+    string name;
+    int size;
+};
+
+optional<Asset> parse_asset(const string &buffer) {
+    Asset asset;
+
+    istringstream iss(buffer);
+    iss >> asset.name >> asset.size;
+    iss.get();
+
+    ofstream file(asset.name);
+    file << iss.rdbuf();
+    file.close();
+    return asset;
+}
+
+void show_asset(vector<string> &args, Connections conns) {
+    if (!validate_args(args, 1)) {
+        return;
+    }
+    auto aid = args[0];
+
+    auto message = "SAS " + aid + "\n";
+    auto response = send_tcp_command(message, conns, "RSA");
+    if (!response) {
         return;
     }
 
-    if (!user) {
-        cerr << "You must be logged in to list your auctions." << endl;
+    auto status = response->status;
+    if (status == NOK) {
+        cout << "auction not found" << endl;
+    } else if (status == OK) {
+        auto asset = parse_asset(response->message);
+        if (!asset) {
+            cerr << "Error parsing asset." << endl;
+            return;
+        }
+        cout << "--- Asset #" << aid << " ---" << endl;
+        cout << "name: " << asset->name << endl;
+        cout << "size: " << asset->size << endl;
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    }
+}
+
+void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
+    if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
