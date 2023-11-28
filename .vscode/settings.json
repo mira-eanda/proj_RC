@@ -1,3 +1,14 @@
 {
-    "C_Cpp.default.cStandard": "gnu23"
+    "C_Cpp.default.cStandard": "gnu23",
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "*.pl": "prolog",
+        "sxhkdrc": "sxhkdrc",
+        "*.html": "jinja-html",
+        "ostream": "cpp",
+        "optional": "cpp",
+        "system_error": "cpp",
+        "iostream": "cpp",
+        "ranges": "cpp"
+    }
 }

@@ -105,6 +105,8 @@ int main(int argc, char *argv[]) {
             list(cmd.args, fd, res);
         } else if (cmd.name == "myauctions" || cmd.name == "ma") {
             list_my_auctions(cmd.args, fd, res, user);
+        } else if (cmd.name == "show_record" || cmd.name == "sr") {
+            show_record(cmd.args, fd, res, user);
         } else if (cmd.name == "logout") {
             logout(cmd.args, fd, res, user);
         } else if (cmd.name == "unregister") {

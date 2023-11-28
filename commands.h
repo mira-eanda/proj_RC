@@ -19,19 +19,6 @@ using namespace std;
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-/*
-login UID password – following this command the User application sends
-a  message  to  the  AS,  using  the  UDP  protocol,  confirm  the  ID,  UID,
-and password  of  this  user, or  register  it  if  this  UID  is  not  present
-in  the  AS database. The  result  of  the  request  should  be  displayed:
-successful  login,  incorrect  login attempt, or new user registered. Login.
-Each user is identified by a user ID UID, a 6-digit IST student number, and a
-password composed of 8 alphanumeric (only letters and digits) characters. When
-the AS receives a login request  it will inform of a successful or incorrect
-login attempt or, in case the UID was not present at the AS, register a new
-user.
-*/
-
 enum status_t { OK, NOK, REG, UNR };
 
 struct Response {
@@ -49,6 +36,22 @@ struct Auction {
     int AID;
     int state;
 };
+
+bool validate_args(const vector<string> &args, int expected) {
+    if (args.size() != expected) {
+        cerr << "Invalid number of args for command." << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool validate_auth(optional<User> &user) {
+    if (!user) {
+        cerr << "You must be logged in to perform this action." << endl;
+        return false;
+    }
+    return true;
+}
 
 optional<Response> parse_response(const string &response, const string type) {
     Response r;
@@ -81,9 +84,8 @@ constexpr auto alphanumeric =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
 optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
-    if (args.size() != 2) {
-        cerr << "Invalid number of args for login command." << std::endl;
-        return {};
+    if (!validate_args(args, 2)) {
+        return;
     }
 
     auto uid = args[0];
@@ -149,13 +151,7 @@ optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
 
 void logout(vector<string> &args, int fd, struct addrinfo *res,
             optional<User> &user) {
-    if (args.size() != 0) {
-        cerr << "Invalid number of args for logout command." << std::endl;
-        return;
-    }
-
-    if (!user) {
-        cerr << "You must be logged in to logout." << endl;
+    if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
@@ -197,13 +193,7 @@ void logout(vector<string> &args, int fd, struct addrinfo *res,
 
 void unregister(vector<string> &args, int fd, struct addrinfo *res,
                 optional<User> &user) {
-    if (args.size() != 0) {
-        cerr << "Invalid number of args for unregister command." << std::endl;
-        return;
-    }
-
-    if (!user) {
-        cerr << "You must be logged in to unregister." << endl;
+    if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
@@ -271,8 +261,7 @@ void print_auctions(const vector<Auction> &auctions) {
 }
 
 void list(vector<string> &args, int fd, struct addrinfo *res) {
-    if (args.size() != 0) {
-        cerr << "Invalid number of args for logout command." << std::endl;
+    if (!validate_args(args, 0)) {
         return;
     }
 
@@ -310,13 +299,7 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
 
 void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
                       optional<User> &user) {
-    if (args.size() != 0) {
-        cerr << "Invalid number of args for logout command." << std::endl;
-        return;
-    }
-
-    if (!user) {
-        cerr << "You must be logged in to list your auctions." << endl;
+    if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
@@ -354,15 +337,15 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
+void show_record(vector<string> &args, int fd, struct addrinfo *res,
+                 optional<User> &user) {
+    cout << "show_record" << endl;
+}
+
 void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
               optional<User> &user) {
-    if (args.size() != 0) {
-        cerr << "Invalid number of args for exit command." << std::endl;
+    if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
-    }
-
-    if (user) {
-        logout(args, fd, res, user);
     }
 
     cout << "Exiting..." << endl;
