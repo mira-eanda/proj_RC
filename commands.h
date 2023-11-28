@@ -79,13 +79,32 @@ optional<Response> parse_response(const string &response, const string type) {
     return r;
 }
 
+optional<Response> send_command(const string &command, int fd,
+                                struct addrinfo *res, const string &type) {
+    auto n = sendto(fd, command.c_str(), command.size(), 0, res->ai_addr,
+                    res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        exit(1);
+    }
+
+    char buffer[128];
+    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error receiving message from AS." << endl;
+        exit(1);
+    }
+
+    return parse_response(buffer, type);
+}
+
 constexpr auto numeric = "0123456789";
 constexpr auto alphanumeric =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
 optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
     if (!validate_args(args, 2)) {
-        return;
+        return {};
     }
 
     auto uid = args[0];
@@ -111,25 +130,8 @@ optional<User> login(vector<string> &args, int fd, struct addrinfo *res) {
         return {};
     }
 
-    // send login request to AS
-    // Send a message to the server
     auto message = "LIN " + uid + " " + password + "\n";
-    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
-                    res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        exit(1);
-    }
-
-    // Receive a message from the server
-    char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
-        exit(1);
-    }
-
-    auto response = parse_response(buffer, "RLI");
+    auto response = send_command(message, fd, res, "RLI");
     if (!response) {
         return {};
     }
@@ -155,25 +157,8 @@ void logout(vector<string> &args, int fd, struct addrinfo *res,
         return;
     }
 
-    // send logout request to AS
-    // Send a message to the server
     auto message = "LOU " + user->uid + " " + user->password + "\n";
-    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
-                    res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        exit(1);
-    }
-
-    // Receive a message from the server
-    char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
-        exit(1);
-    }
-
-    auto response = parse_response(buffer, "RLO");
+    auto response = send_command(message, fd, res, "RLO");
     if (!response) {
         return;
     }
@@ -197,25 +182,8 @@ void unregister(vector<string> &args, int fd, struct addrinfo *res,
         return;
     }
 
-    // send unregister request to AS
-    // Send a message to the server
     auto message = "UNR " + user->uid + " " + user->password + "\n";
-    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
-                    res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        exit(1);
-    }
-
-    // Receive a message from the server
-    char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
-        exit(1);
-    }
-
-    auto response = parse_response(buffer, "RUR");
+    auto response = send_command(message, fd, res, "RUR");
     if (!response) {
         return;
     }
@@ -266,22 +234,7 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     auto message = "LST\n";
-    auto n =
-        sendto(fd, message, strlen(message), 0, res->ai_addr, res->ai_addrlen);
-
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        exit(1);
-    }
-    // Receive a message from the server
-    char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
-        exit(1);
-    }
-
-    auto response = parse_response(buffer, "RLS");
+    auto response = send_command(message, fd, res, "RLS");
     if (!response) {
         return;
     }
@@ -304,22 +257,7 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
     }
 
     auto message = "LMA " + user->uid + "\n";
-    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
-                    res->ai_addrlen);
-
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        exit(1);
-    }
-    // Receive a message from the server
-    char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
-        exit(1);
-    }
-
-    auto response = parse_response(buffer, "RMA");
+    auto response = send_command(message, fd, res, "RMA");
     if (!response) {
         return;
     }
@@ -337,9 +275,10 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
     }
 }
 
-void show_record(vector<string> &args, int fd, struct addrinfo *res,
-                 optional<User> &user) {
-    cout << "show_record" << endl;
+void show_record(vector<string> &args, int fd, struct addrinfo *res) {
+    if (!validate_args(args, 1)) {
+        return;
+    }
 }
 
 void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
