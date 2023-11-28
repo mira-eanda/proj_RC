@@ -17,12 +17,12 @@ using namespace std;
 
 struct UDPConnection {
     int fd;
-    struct sockaddr_in* addr;
+    struct addrinfo* addr;
 };
 
 struct TCPConnection {
     int fd;
-    struct sockaddr_in addr;
+    struct addrinfo* addr;
 };
 
 struct Connections {
@@ -97,19 +97,22 @@ optional<Response> parse_response(const string &response, const string type) {
     return r;
 }
 
-optional<Response> send_command(const string &command, Connections conns, const string &type) {
-    auto n = sendto(conns.udp.fd, command.c_str(), command.size(), 0, conns.udp.addr->ai_addr,
-                    conns.udp.addr->ai_addrlen);
+optional<Response> send_udp_command(const string &command, Connections conns,
+                                const string &type) {
+    auto n = sendto(conns.udp.fd, command.c_str(), command.size(), 0,
+                    conns.udp.addr->ai_addr, conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error sending message to AS." << endl;
-        exit(1);
+        cerr << "Error: " << strerror(errno) << endl;
+        return {};
     }
 
     char buffer[128];
-    n = recvfrom(conns.udp.fd, buffer, 128, 0, conns.udp.addr->ai_addr, &conns.udp.addr->ai_addrlen);
+    n = recvfrom(conns.udp.fd, buffer, 128, 0, conns.udp.addr->ai_addr,
+                 &conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error receiving message from AS." << endl;
-        exit(1);
+        return {};
     }
 
     return parse_response(buffer, type);
@@ -119,7 +122,7 @@ constexpr auto numeric = "0123456789";
 constexpr auto alphanumeric =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ";
 
-optional<User> login(vector<string> &args, Connections conns,) {
+optional<User> login(vector<string> &args, Connections conns) {
     if (!validate_args(args, 2)) {
         return {};
     }
@@ -148,7 +151,7 @@ optional<User> login(vector<string> &args, Connections conns,) {
     }
 
     auto message = "LIN " + uid + " " + password + "\n";
-    auto response = send_command(message, conns, "RLI");
+    auto response = send_udp_command(message, conns, "RLI");
     if (!response) {
         return {};
     }
@@ -168,14 +171,13 @@ optional<User> login(vector<string> &args, Connections conns,) {
     return {};
 }
 
-void logout(vector<string> &args, Connections conns,
-            optional<User> &user) {
+void logout(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
     auto message = "LOU " + user->uid + " " + user->password + "\n";
-    auto response = send_command(message, conns, "RLO");
+    auto response = send_udp_command(message, conns, "RLO");
     if (!response) {
         return;
     }
@@ -193,14 +195,13 @@ void logout(vector<string> &args, Connections conns,
     }
 }
 
-void unregister(vector<string> &args, Connections conns,
-                optional<User> &user) {
+void unregister(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 0) || !validate_auth(user)) {
         return;
     }
 
     auto message = "UNR " + user->uid + " " + user->password + "\n";
-    auto response = send_command(message, conns, "RUR");
+    auto response = send_udp_command(message, conns, "RUR");
     if (!response) {
         return;
     }
@@ -229,11 +230,12 @@ vector<Auction> parse_listed_auctions(const string &buffer) {
 }
 
 void print_auctions(const vector<Auction> &auctions) {
-    auto filtered = auctions;
-    filtered.erase(
-        std::remove_if(filtered.begin(), filtered.end(),
-                       [](const Auction &a) { return a.state != 1; }),
-        filtered.end());
+    auto filtered = vector<Auction>();
+    for (auto auction : filtered) {
+        if (auction.state == 0) {
+            filtered.push_back(auction);
+        }
+    }
 
     if (filtered.empty()) {
         cout << "no auctions are currently active" << endl;
@@ -253,7 +255,7 @@ void list(vector<string> &args, Connections conns) {
     }
 
     auto message = "LST\n";
-    auto response = send_command(message, conns, "RLS");
+    auto response = send_udp_command(message, conns, "RLS");
     if (!response) {
         return;
     }
@@ -276,13 +278,12 @@ void list_my_auctions(vector<string> &args, Connections conns,
     }
 
     auto message = "LMA " + user->uid + "\n";
-    auto response = send_command(message, conns, "RMA");
+    auto response = send_udp_command(message, conns, "RMA");
     if (!response) {
         return;
     }
 
     auto status = response->status;
-    cout << "status: " << status << endl;
 
     if (status == NOK) {
         cout << "no auctions are currently active" << endl;
@@ -348,7 +349,7 @@ void show_record(vector<string> &args, Connections conns) {
     auto aid = args[0];
 
     auto message = "SRC " + aid + "\n";
-    auto response = send_command(message, conns, "RRC");
+    auto response = send_udp_command(message, conns, "RRC");
     if (!response) {
         return;
     }
@@ -386,8 +387,7 @@ void show_record(vector<string> &args, Connections conns) {
     }
 }
 
-void my_bids(vector<string> &args, Connections conns,
-             optional<User> &user) {
+void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
     if (args.size() != 0) {
         cerr << "Invalid number of args for logout command." << std::endl;
         return;
@@ -399,7 +399,7 @@ void my_bids(vector<string> &args, Connections conns,
     }
 
     auto message = "LMB " + user->uid + "\n";
-    auto response = send_command(message, conns, "RMB");
+    auto response = send_udp_command(message, conns, "RMB");
     if (!response) {
         return;
     }
@@ -418,8 +418,7 @@ void my_bids(vector<string> &args, Connections conns,
     }
 }
 
-void exit_cli(vector<string> &args, Connections conns,
-              optional<User> &user) {
+void exit_cli(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 0)) {
         return;
     }
