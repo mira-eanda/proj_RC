@@ -3,7 +3,6 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <optional>
-#include <ranges>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,9 +215,11 @@ vector<Auction> parse_listed_auctions(const string &buffer) {
 }
 
 void print_auctions(const vector<Auction> &auctions) {
-    auto filtered = auctions | views::filter([](auto auction) {
-                        return auction.state == 1;
-                    });
+    auto filtered = auctions;
+    filtered.erase(
+        std::remove_if(filtered.begin(), filtered.end(),
+                       [](const Auction &a) { return a.state != 1; }),
+        filtered.end());
 
     if (filtered.empty()) {
         cout << "no auctions are currently active" << endl;
@@ -385,22 +386,7 @@ void my_bids(vector<string> &args, int fd, struct addrinfo *res,
     }
 
     auto message = "LMB " + user->uid + "\n";
-
-    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
-                    res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        exit(1);
-    }
-
-    char buffer[128];
-    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
-        exit(1);
-    }
-
-    auto response = parse_response(buffer, "RMB");
+    auto response = send_command(message, fd, res, "RMB");
     if (!response) {
         return;
     }
@@ -409,7 +395,7 @@ void my_bids(vector<string> &args, int fd, struct addrinfo *res,
 
     if (status == NOK) {
         cout << "no ongoing bids" << endl;
-    } else if (status == NLG) { // não é preciso probably
+    } else if (status == NLG) { 
         cout << "user not logged in" << endl;
     } else if (status == OK) {
         auto auctions = parse_listed_auctions(response->message);
