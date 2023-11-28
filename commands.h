@@ -3,6 +3,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -253,13 +254,18 @@ vector<Auction> parse_listed_auctions(const string &buffer) {
 }
 
 void print_auctions(const vector<Auction> &auctions) {
-    if (auctions.size() == 0) {
+    auto filtered = auctions | views::filter([](auto auction) {
+                        return auction.state == 1;
+                    });
+
+    if (filtered.empty()) {
         cout << "no auctions are currently active" << endl;
         return;
     }
-    for (auto auction : auctions) {
+    for (auto auction : filtered) {
         if (auction.state == 1) {
-            cout << auction.AID << " - " << "active" << endl;
+            cout << auction.AID << " - "
+                 << "active" << endl;
         }
     }
 }
