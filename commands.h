@@ -19,7 +19,7 @@ using namespace std;
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-enum status_t { OK, NOK, REG, UNR };
+enum status_t { OK, NOK, REG, UNR, NLG};
 
 struct Response {
     string type;
@@ -64,7 +64,11 @@ optional<Response> parse_response(const string &response, const string type) {
     if (response[4] == 'O') {
         r.status = OK;
     } else if (response[4] == 'N') {
-        r.status = NOK;
+        if (response[5] == 'O') {
+            r.status = NOK;
+        } else if (response[5] == 'L') {
+            r.status = NLG;
+        }
     } else if (response[4] == 'R') {
         r.status = REG;
     } else if (response[4] == 'U') {
@@ -362,6 +366,54 @@ void show_record(vector<string> &args, int fd, struct addrinfo *res) {
             cout << "bid_date_time: " << bid.bid_date_time << endl;
             cout << "bid_sec_time: " << bid.bid_sec_time << endl;
         }
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    }
+}
+
+
+void my_bids(vector<string> &args, int fd, struct addrinfo *res,
+              optional<User> &user) {
+    if (args.size() != 0) {
+        cerr << "Invalid number of args for logout command." << std::endl;
+        return;
+    }
+
+    if (!user) {
+        cerr << "You must be logged in to list your auctions." << endl;
+        return;
+    }
+
+    auto message = "LMB " + user->uid + "\n";
+
+    auto n = sendto(fd, message.c_str(), message.size(), 0, res->ai_addr,
+                    res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        exit(1);
+    }
+
+    char buffer[128];
+    n = recvfrom(fd, buffer, 128, 0, res->ai_addr, &res->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error receiving message from AS." << endl;
+        exit(1);
+    }
+
+    auto response = parse_response(buffer, "RMB");
+    if (!response) {
+        return;
+    }
+
+    auto status = response->status;
+
+    if (status == NOK) {
+        cout << "no ongoing bids" << endl;
+    } else if (status == NLG) { // não é preciso probably
+        cout << "user not logged in" << endl;
+    } else if (status == OK) {
+        auto auctions = parse_listed_auctions(response->message);
+        print_auctions(auctions);
     } else {
         cerr << "Unexpected response status: " << status << endl;
     }
