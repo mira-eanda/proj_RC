@@ -344,8 +344,12 @@ void show_record(vector<string> &args, int fd, struct addrinfo *res,
 
 void exit_cli(vector<string> &args, int fd, struct addrinfo *res,
               optional<User> &user) {
-    if (!validate_args(args, 0) || !validate_auth(user)) {
+    if (!validate_args(args, 0)) {
         return;
+    }
+
+    if (user) {
+        logout(args, fd, res, user);
     }
 
     cout << "Exiting..." << endl;
