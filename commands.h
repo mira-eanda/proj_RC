@@ -285,7 +285,6 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
         cerr << "Error receiving message from AS." << endl;
         exit(1);
     }
-    cout << buffer << endl;
 
     auto response = parse_response(buffer, "RLS");
     if (!response) {
@@ -293,8 +292,6 @@ void list(vector<string> &args, int fd, struct addrinfo *res) {
     }
 
     auto status = response->status;
-    cout << "status: " << status << endl;
-
     if (status == NOK) {
         cout << "no auctions are currently active" << endl;
     } else if (status == OK) {
@@ -345,7 +342,7 @@ void list_my_auctions(vector<string> &args, int fd, struct addrinfo *res,
         cout << "no auctions are currently active" << endl;
     } else if (status == OK) {
         auto auctions = parse_listed_auctions(response->message);
-        // cout << buffer + 7 << endl;
+        print_auctions(auctions);
     } else {
         cerr << "Unexpected response status: " << status << endl;
     }
