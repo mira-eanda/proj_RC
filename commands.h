@@ -14,6 +14,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -50,6 +52,12 @@ struct User {
 struct Auction {
     int AID;
     int state;
+};
+
+struct File {
+    string name;
+    long int size;
+    string data;
 };
 
 bool validate_args(const vector<string> &args, int expected) {
@@ -498,6 +506,62 @@ void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
         cerr << "Unexpected response status: " << status << endl;
     }
 }
+
+
+optional<File> get_file_info(const string &fname) {
+    ifstream file(fname, ios::binary | ios::ate);
+    if (!file.is_open()) {
+        cerr << "Error opening file: " << fname << endl;
+        return {};
+    }
+
+    auto size = file.tellg();
+    file.seekg(0, ios::beg);
+
+    auto data = string(size, ' ');
+    file.read(&data[0], size);
+
+    return File{fname, size, data};
+}
+
+void open(vector<string> &args, Connections conns, optional<User> &user){
+    if (!validate_args(args, 4)) {
+        return;
+    }
+    
+    // open name asset_fname start_value timeactive
+    auto name = args[0];
+    auto asset_fname = args[1];
+    auto start_value = args[2];
+    auto timeactive = args[3];
+
+
+    auto file = get_file_info(asset_fname);
+    
+
+    // OPA UID password name start_value timeactive Fname Fsize Fdata
+    auto message = "OPA " +  user->uid + " " + user->password + " " + name + " " 
+        + start_value + " " + timeactive + " " + file->name + " " + 
+        to_string(file->size) + " " + file->data + "\n";
+    auto response = send_tcp_command(message, conns, "ROA");
+    if (!response) {
+        return;
+    }
+
+    auto status = response->status;
+    auto aid = response->message;
+    if (status == NOK) {
+        cout << "auction could not be started" << endl;
+    } else if (status == NLG) {
+        cout << "user not logged in" << endl;
+    } else if (status == OK) {
+        cout << "auction started" << endl;
+        cout << "AID: " << aid << endl;
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    } 
+}
+
 
 void exit_cli(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 0)) {

@@ -125,6 +125,8 @@ int main(int argc, char *argv[]) {
             show_asset(cmd.args, connections);
         } else if (cmd.name == "mybids" || cmd.name == "mb") {
             my_bids(cmd.args, connections, user);
+        } else if (cmd.name == "open") {
+            open(cmd.args, connections, user);
         } else if (cmd.name == "logout") {
             logout(cmd.args, connections, user);
         } else if (cmd.name == "unregister") {
