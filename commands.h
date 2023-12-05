@@ -14,8 +14,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
-#include <fstream>
-#include <sstream>
 
 using namespace std;
 
@@ -43,7 +41,7 @@ struct Connections {
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END};
+enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END, REF, ILG, ACC};
 
 struct Response {
     string type;
@@ -57,8 +55,8 @@ struct User {
 };
 
 struct Auction {
-    int AID;
-    int state;
+    string AID;
+    bool state;
 };
 
 struct File {
@@ -93,6 +91,10 @@ optional<Response> parse_response(const string &response, const string type) {
     }
     if (response[4] == 'O') {
         r.status = OK;
+    } else if (response[4] == 'A') {
+        r.status = ACC;
+    } else if (response[4] == 'I') {
+        r.status = ILG;
     } else if (response[4] == 'N') {
         if (response[5] == 'O') {
             r.status = NOK;
@@ -100,7 +102,11 @@ optional<Response> parse_response(const string &response, const string type) {
             r.status = NLG;
         }
     } else if (response[4] == 'R') {
-        r.status = REG;
+        if (response[6] == 'G') {
+            r.status = REG;
+        } else if (response[6] == 'F') {
+            r.status = REF;
+        }
     } else if (response[4] == 'U') {
         r.status = UNR;
     } else {
@@ -123,8 +129,8 @@ optional<Response> send_udp_command(const string &command, Connections conns,
         return {};
     }
 
-    char buffer[128];
-    n = recvfrom(conns.udp.fd, buffer, 128, 0, conns.udp.addr->ai_addr,
+    char buffer[6000];
+    n = recvfrom(conns.udp.fd, buffer, 6000, 0, conns.udp.addr->ai_addr,
                  &conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error receiving message from AS." << endl;
@@ -277,17 +283,18 @@ void unregister(vector<string> &args, Connections conns, optional<User> &user) {
 vector<Auction> parse_listed_auctions(const string &buffer) {
     vector<Auction> auctions;
     std::istringstream iss(buffer);
-    int AID, state;
+    string AID, state;
     while (iss >> AID >> state) {
-        auctions.push_back({AID, state});
+        auto auction = Auction{AID, state == "1"};
+        auctions.push_back(auction);
     }
     return auctions;
 }
 
 void print_auctions(const vector<Auction> &auctions) {
     auto filtered = vector<Auction>();
-    for (auto auction : filtered) {
-        if (auction.state == 0) {
+    for (auto auction : auctions) {
+        if (auction.state == true) {
             filtered.push_back(auction);
         }
     }
@@ -376,8 +383,11 @@ struct AuctionInfo {
 optional<AuctionInfo> parse_auction_info(const string &buffer) {
     AuctionInfo info;
     std::istringstream iss(buffer);
+    string date, time;
     iss >> info.host_UID >> info.auction_name >> info.asset_fname >>
-        info.start_value >> info.start_date_time >> info.timeactive;
+        info.start_value >> date >> time >> info.timeactive;
+
+    info.start_date_time = date + " " + time;
 
     string bid;
     while (iss >> bid) {
@@ -388,8 +398,9 @@ optional<AuctionInfo> parse_auction_info(const string &buffer) {
             break;
         } else {
             BidInfo bid_info;
-            iss >> bid_info.bidder_UID >> bid_info.bid_value >>
-                bid_info.bid_date_time >> bid_info.bid_sec_time;
+            iss >> bid_info.bidder_UID >> bid_info.bid_value >> date >> time >>
+                bid_info.bid_sec_time;
+            bid_info.bid_date_time = date + " " + time;
             info.bids.push_back(bid_info);
         }
     }
@@ -539,11 +550,11 @@ optional<File> get_file_info(const string &fname) {
     return File{fname, size, data};
 }
 
-void open(vector<string> &args, Connections conns, optional<User> &user){
+void open(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 4)) {
         return;
     }
-    
+
     // open name asset_fname start_value timeactive
     auto name = args[0];
     auto asset_fname = args[1];
@@ -557,12 +568,11 @@ void open(vector<string> &args, Connections conns, optional<User> &user){
     }
 
     auto file = get_file_info(asset_fname);
-    
 
     // OPA UID password name start_value timeactive Fname Fsize Fdata
-    auto message = "OPA " +  user->uid + " " + user->password + " " + name + " " 
-        + start_value + " " + timeactive + " " + file->name + " " + 
-        to_string(file->size) + " " + file->data + "\n";
+    auto message = "OPA " + user->uid + " " + user->password + " " + name +
+                   " " + start_value + " " + timeactive + " " + file->name +
+                   " " + to_string(file->size) + " " + file->data + "\n";
     auto response = send_tcp_command(message, conns, "ROA");
     if (!response) {
         return;
@@ -579,9 +589,39 @@ void open(vector<string> &args, Connections conns, optional<User> &user){
         cout << "AID: " << aid << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;
-    } 
+    }
 }
 
+void bid(vector<string> &args, Connections conns, optional<User> &user) {
+    if (!validate_args(args, 2) || !validate_auth(user)) {
+        return;
+    }
+
+    auto aid = args[0];
+    auto value = args[1];
+
+    auto message = "BID " + user->uid + " " + user->password + " " + aid + " " +
+                   value + "\n";
+    auto response = send_tcp_command(message, conns, "RBD");
+    if (!response) {
+        return;
+    }
+
+    auto status = response->status;
+    if (status == NOK) {
+        cout << "auction not active" << endl;
+    } else if (status == NLG) {
+        cout << "user not logged in" << endl;
+    } else if (status == REF) {
+        cout << "larger bid has already been placed before" << endl;
+    } else if (status == ILG) {
+        cout << "not allowed to bid on your own auction" << endl;
+    } else if (status == ACC) {
+        cout << "bid accepted" << endl;
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    }
+}
 
 void close(vector<string> &args, Connections conns, optional<User> &user){
     if (!validate_args(args, 1) || !validate_auth(user)) {

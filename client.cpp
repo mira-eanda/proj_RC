@@ -129,6 +129,8 @@ int main(int argc, char *argv[]) {
             open(cmd.args, connections, user);
         } else if (cmd.name == "close") {
             close(cmd.args, connections, user);
+        } else if (cmd.name == "bid" || cmd.name == "b") {
+            bid(cmd.args, connections, user);
         } else if (cmd.name == "logout") {
             logout(cmd.args, connections, user);
         } else if (cmd.name == "unregister") {
