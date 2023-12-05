@@ -48,8 +48,8 @@ struct User {
 };
 
 struct Auction {
-    int AID;
-    int state;
+    string AID;
+    bool state;
 };
 
 struct File {
@@ -276,17 +276,18 @@ void unregister(vector<string> &args, Connections conns, optional<User> &user) {
 vector<Auction> parse_listed_auctions(const string &buffer) {
     vector<Auction> auctions;
     std::istringstream iss(buffer);
-    int AID, state;
+    string AID, state;
     while (iss >> AID >> state) {
-        auctions.push_back({AID, state});
+        auto auction = Auction{AID, state == "1"};
+        auctions.push_back(auction);
     }
     return auctions;
 }
 
 void print_auctions(const vector<Auction> &auctions) {
     auto filtered = vector<Auction>();
-    for (auto auction : filtered) {
-        if (auction.state == 0) {
+    for (auto auction : auctions) {
+        if (auction.state == true) {
             filtered.push_back(auction);
         }
     }
