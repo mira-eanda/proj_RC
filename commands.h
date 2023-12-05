@@ -107,6 +107,14 @@ optional<Response> parse_response(const string &response, const string type) {
         } else if (response[6] == 'F') {
             r.status = REF;
         }
+    } else if (response[4] == 'E') {
+        if (response[5] == 'A') {
+            r.status = EAU;
+        } else if (response[5] == 'O') {
+            r.status = EOW;
+        } else if (response[5] == 'N') {
+            r.status = END;
+        }
     } else if (response[4] == 'U') {
         r.status = UNR;
     } else {
