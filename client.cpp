@@ -16,7 +16,6 @@
 
 using namespace std;
 
-constexpr auto PORT = "58001";
 constexpr auto DEFAULT_PORT = "58033";
 
 // ./client -n "tejo.tecnico.ulisboa.pt" -p 58001
