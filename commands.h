@@ -19,6 +19,13 @@
 
 using namespace std;
 
+#define NAME_SIZE 10
+#define NAME_ERROR "name must be up to 10 alphanumeric characters long."
+#define START_VALUE_SIZE 6
+#define START_VALUE_ERROR "start_value must be up to 6 digits long."
+#define TIMEACTIVE_SIZE 5
+#define TIMEACTIVE_ERROR "timeactive must be up to 5 digits long."
+
 struct UDPConnection {
     int fd;
     struct addrinfo *addr;
@@ -36,7 +43,7 @@ struct Connections {
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-enum status_t { OK, NOK, REG, UNR, NLG };
+enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END};
 
 struct Response {
     string type;
@@ -507,6 +514,14 @@ void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
     }
 }
 
+bool validate_input(const std::string& input, size_t max_length, const std::string& allowed_chars, 
+    const std::string& error_message) {
+    if (input.size() > max_length || input.find_first_not_of(allowed_chars) != std::string::npos) {
+        std::cerr << error_message << std::endl;
+        return false;
+    }
+    return true;
+}
 
 optional<File> get_file_info(const string &fname) {
     ifstream file(fname, ios::binary | ios::ate);
@@ -535,6 +550,11 @@ void open(vector<string> &args, Connections conns, optional<User> &user){
     auto start_value = args[2];
     auto timeactive = args[3];
 
+    if (!validate_input(name, NAME_SIZE, alphanumeric, NAME_ERROR) ||
+        !validate_input(start_value, START_VALUE_SIZE, numeric, START_VALUE_ERROR) ||
+        !validate_input(timeactive, TIMEACTIVE_SIZE, numeric, TIMEACTIVE_ERROR)) {
+        return;
+    }
 
     auto file = get_file_info(asset_fname);
     
@@ -562,6 +582,38 @@ void open(vector<string> &args, Connections conns, optional<User> &user){
     } 
 }
 
+
+void close(vector<string> &args, Connections conns, optional<User> &user){
+    if (!validate_args(args, 1) || !validate_auth(user)) {
+        return;
+    }
+    
+    auto aid = args[0];
+    
+    auto message = "CLS " +  user->uid + " " + user->password + " " + aid + "\n";
+
+    auto response = send_tcp_command(message, conns, "RCL");
+    if (!response) {
+        return;
+    }
+    
+    auto status = response->status;
+    if (status == NOK) {
+        cout << "auction could not be closed" << endl;
+    } else if (status == NLG) {
+        cout << "user not logged in" << endl;
+    } else if (status == OK) {
+        cout << "auction closed" << endl;
+    } else if (status == EAU) {
+        cout << "auction does not exist" << endl;
+    } else if (status == EOW) {
+        cout << "auction is not owned by user" << endl;
+    } else if (status == END) {
+        cout << "auction has already finished" << endl;
+    } else {
+        cerr << "Unexpected response status: " << status << endl;
+    }
+}
 
 void exit_cli(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 0)) {
