@@ -449,7 +449,9 @@ void show_record(vector<string> &args, Connections conns) {
             cout << "end_date_time: " << info->end->end_date_time << endl;
             cout << "end_sec_time: " << info->end->end_sec_time << endl;
         }
-        for (auto bid : info->bids) {
+        
+        for (size_t i = 0; i < info->bids.size() && i < 50; i++) {
+            auto bid = info->bids[i];
             cout << "--- Bid info ---" << endl;
             cout << "bidder_UID: " << bid.bidder_UID << endl;
             cout << "bid_value: " << bid.bid_value << endl;
