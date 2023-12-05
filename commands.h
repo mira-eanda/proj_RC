@@ -122,8 +122,8 @@ optional<Response> send_udp_command(const string &command, Connections conns,
         return {};
     }
 
-    char buffer[256];
-    n = recvfrom(conns.udp.fd, buffer, 256, 0, conns.udp.addr->ai_addr,
+    char buffer[6000];
+    n = recvfrom(conns.udp.fd, buffer, 6000, 0, conns.udp.addr->ai_addr,
                  &conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error receiving message from AS." << endl;
