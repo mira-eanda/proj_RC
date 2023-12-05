@@ -122,8 +122,8 @@ optional<Response> send_udp_command(const string &command, Connections conns,
         return {};
     }
 
-    char buffer[128];
-    n = recvfrom(conns.udp.fd, buffer, 128, 0, conns.udp.addr->ai_addr,
+    char buffer[256];
+    n = recvfrom(conns.udp.fd, buffer, 256, 0, conns.udp.addr->ai_addr,
                  &conns.udp.addr->ai_addrlen);
     if (n == -1) {
         cerr << "Error receiving message from AS." << endl;
@@ -375,8 +375,11 @@ struct AuctionInfo {
 optional<AuctionInfo> parse_auction_info(const string &buffer) {
     AuctionInfo info;
     std::istringstream iss(buffer);
+    string date, time;
     iss >> info.host_UID >> info.auction_name >> info.asset_fname >>
-        info.start_value >> info.start_date_time >> info.timeactive;
+        info.start_value >> date >> time >> info.timeactive;
+
+    info.start_date_time = date + " " + time;
 
     string bid;
     while (iss >> bid) {
@@ -387,8 +390,9 @@ optional<AuctionInfo> parse_auction_info(const string &buffer) {
             break;
         } else {
             BidInfo bid_info;
-            iss >> bid_info.bidder_UID >> bid_info.bid_value >>
-                bid_info.bid_date_time >> bid_info.bid_sec_time;
+            iss >> bid_info.bidder_UID >> bid_info.bid_value >> date >> time >>
+                bid_info.bid_sec_time;
+            bid_info.bid_date_time = date + " " + time;
             info.bids.push_back(bid_info);
         }
     }
