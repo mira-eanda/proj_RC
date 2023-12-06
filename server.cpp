@@ -16,7 +16,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "common.hpp"
+#include "server_commands.hpp"
 
 using namespace std;
 
@@ -38,25 +38,6 @@ Arguments parse_arguments(int argc, char *argv[]) {
         }
     }
     return args;
-}
-
-struct Request {
-    string type;
-    string message;
-};
-
-Request parse_request(const string &input) {
-    Request req;
-
-    istringstream iss(input);
-    iss >> req.type;
-
-    string arg;
-    while (iss >> arg) {
-        req.message += arg + " ";
-    }
-
-    return req;
 }
 
 int main(int argc, char *argv[]) {
@@ -89,6 +70,7 @@ int main(int argc, char *argv[]) {
     timeval timeout{};
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
+    auto db = new Database();
 
     while (1) {
         testfds = inputs; // Reload mask
@@ -124,8 +106,9 @@ int main(int argc, char *argv[]) {
                     }
                     auto req = parse_request(res.value());
                     if (req.type == "LIN") {
-                        cout << "Lin: " << req.message << endl;
-                        send_udp("RLI OK\n", conns);
+                        handle_login(req, conns, db);
+                    } else if (req.type == "LOU") {
+                        handle_logout(req, conns, db);
                     }
                 }
             }

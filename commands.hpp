@@ -1,3 +1,4 @@
+#ifndef COMMANDS_HPP
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <fstream>
@@ -628,3 +629,5 @@ void exit_cli(vector<string> &args, Connections conns, optional<User> &user) {
     cout << "Exiting..." << endl;
     exit(0);
 }
+
+#endif

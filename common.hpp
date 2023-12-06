@@ -1,3 +1,4 @@
+#ifndef COMMON_HPP
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <iostream>
@@ -9,9 +10,26 @@
 
 using namespace std;
 
-struct User {
+class User {
+  public:
     string uid;
     string password;
+    bool logged_in = false;
+
+    string serialize() const {
+        stringstream ss;
+        ss << uid << ' ' << password << ' ' << logged_in;
+        return ss.str();
+    }
+
+    static User deserialize(const string &str) {
+        User user;
+        stringstream ss(str);
+        string logged_in;
+        ss >> user.uid >> user.password >> logged_in;
+        user.logged_in = logged_in == "1";
+        return user;
+    }
 };
 
 struct UDPConnection {
@@ -63,3 +81,4 @@ UDPConnection init_udp_connection(addrinfo hints, const char *IP,
     }
     return udp;
 }
+#endif
