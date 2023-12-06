@@ -4,7 +4,9 @@
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <optional>
 #include <signal.h>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,9 +16,12 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "common.hpp"
+
 using namespace std;
 
 constexpr auto DEFAULT_PORT = "58033";
+constexpr timeval TIMEOUT_INTERVAL = {10, 0}; // 10 seconds
 
 struct Arguments {
     const char *ASport = DEFAULT_PORT;
@@ -35,87 +40,93 @@ Arguments parse_arguments(int argc, char *argv[]) {
     return args;
 }
 
+struct Request {
+    string type;
+    string message;
+};
+
+Request parse_request(const string &input) {
+    Request req;
+
+    istringstream iss(input);
+    iss >> req.type;
+
+    string arg;
+    while (iss >> arg) {
+        req.message += arg + " ";
+    }
+
+    return req;
+}
+
 int main(int argc, char *argv[]) {
     auto args = parse_arguments(argc, argv);
 
-    char in_str[128];
-
     fd_set inputs, testfds;
-    struct timeval timeout;
+    Connections conns{};
 
-    int i, out_fds, n, errcode, ret;
+    addrinfo hints{};
 
-    char prt_str[90];
-
-    // socket variables
-    struct addrinfo hints, *res;
-    struct sockaddr_in udp_useraddr;
-    socklen_t addrlen;
-    int ufd;
-
-    char host[NI_MAXHOST], service[NI_MAXSERV];
-
-    // UDP SERVER SECTION
+    // Configure udp server address
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
 
-    if ((errcode = getaddrinfo(NULL, DEFAULT_PORT, &hints, &res)) != 0)
-        exit(1); // On error
+    conns.udp = init_udp_connection(hints, NULL, args.ASport);
 
-    ufd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (ufd == -1)
+    if ((bind(conns.udp.fd, conns.udp.addr->ai_addr,
+              conns.udp.addr->ai_addrlen)) == -1) {
+        cerr << "Bind error UDP server" << endl;
         exit(1);
-
-    if (bind(ufd, res->ai_addr, res->ai_addrlen) == -1) {
-        sprintf(prt_str, "Bind error UDP server\n");
-        write(1, prt_str, strlen(prt_str));
-        exit(1); // On error
     }
-    if (res != NULL)
-        freeaddrinfo(res);
 
-    FD_ZERO(&inputs);     // Clear input mask
-    FD_SET(0, &inputs);   // Set standard input channel on
-    FD_SET(ufd, &inputs); // Set UDP channel on
+    FD_ZERO(&inputs);              // Clear input mask
+    FD_SET(0, &inputs);            // Set standard input channel on
+    FD_SET(conns.udp.fd, &inputs); // Set UDP channel on
+
+    string line;
+    timeval timeout{};
+
+    char host[NI_MAXHOST], service[NI_MAXSERV];
 
     while (1) {
         testfds = inputs; // Reload mask
-        //        printf("testfds byte: %d\n",((char *)&testfds)[0]); // Debug
-        memset((void *)&timeout, 0, sizeof(timeout));
-        timeout.tv_sec = 10;
+        timeout = TIMEOUT_INTERVAL;
 
-        out_fds = select(FD_SETSIZE, &testfds, (fd_set *)NULL, (fd_set *)NULL,
-                         (struct timeval *)&timeout);
-        // testfds is now '1' at the positions that were activated
-        //        printf("testfds byte: %d\n",((char *)&testfds)[0]); // Debug
+        int out_fds = select(FD_SETSIZE, &testfds, NULL, NULL, &timeout);
+
         switch (out_fds) {
         case 0:
-            printf("\n ---------------Timeout event-----------------\n");
+            cout << "Timeout" << endl;
             break;
         case -1:
-            perror("select");
+            cerr << "Select error" << endl;
             exit(1);
         default:
             if (FD_ISSET(0, &testfds)) {
-                fgets(in_str, 50, stdin);
-                printf("---Input at keyboard: %s\n", in_str);
+                getline(cin, line);
+                if (line == "exit") {
+                    cout << "Exiting..." << endl;
+                    exit(0);
+                }
             }
-            if (FD_ISSET(ufd, &testfds)) {
-                addrlen = sizeof(udp_useraddr);
-                ret = recvfrom(ufd, prt_str, 80, 0,
-                               (struct sockaddr *)&udp_useraddr, &addrlen);
-                if (ret >= 0) {
-                    if (strlen(prt_str) > 0)
-                        prt_str[ret - 1] = 0;
-                    printf("Received through UDP: %s\n", prt_str);
-                    errcode = getnameinfo((struct sockaddr *)&udp_useraddr,
-                                          addrlen, host, sizeof host, service,
-                                          sizeof service, 0);
-                    if (errcode == 0)
-                        printf("Sent by [%s:%s]\n", host, service);
-
+            if (FD_ISSET(conns.udp.fd, &testfds)) {
+                auto res = receive_udp(conns);
+                if (res.has_value()) {
+                    if (args.verbose && getnameinfo(conns.udp.addr->ai_addr,
+                                                    conns.udp.addr->ai_addrlen,
+                                                    host, sizeof host, service,
+                                                    sizeof service, 0) == 0) {
+                        cout << "Received through UDP: " << res.value() << endl;
+                        cout << "Sent by [" << host << ":" << service << "]"
+                             << endl;
+                    }
+                    auto req = parse_request(res.value());
+                    if (req.type == "LIN") {
+                        cout << "Lin: " << req.message << endl;
+                        send_udp("RLI OK\n", conns);
+                    }
                 }
             }
         }

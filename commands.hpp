@@ -15,6 +15,8 @@
 #include <unistd.h>
 #include <vector>
 
+#include "common.hpp"
+
 using namespace std;
 
 constexpr auto NAME_SIZE = 10;
@@ -26,34 +28,15 @@ constexpr auto TIMEACTIVE_SIZE = 5;
 constexpr auto TIMEACTIVE_ERROR = "timeactive must be up to 5 digits long.";
 constexpr auto MAX_BIDS = 50;
 
-struct UDPConnection {
-    int fd;
-    struct addrinfo *addr;
-};
-
-struct TCPConnection {
-    struct addrinfo *addr;
-};
-
-struct Connections {
-    UDPConnection udp;
-    TCPConnection tcp;
-};
-
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END, REF, ILG, ACC };
+// enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END, REF, ILG, ACC };
 
 struct Response {
     string type;
-    status_t status;
+    string status;
     string message;
-};
-
-struct User {
-    string uid;
-    string password;
 };
 
 struct Auction {
@@ -85,42 +68,12 @@ bool validate_auth(optional<User> &user) {
 
 optional<Response> parse_response(const string &response, const string type) {
     Response r;
-    r.type = response.substr(0, 3);
+    istringstream iss(response);
+    iss >> r.type;
+    iss >> r.status;
 
     if (r.type != type) {
         cerr << "Unexpected response type: " << r.type << endl;
-        return {};
-    }
-    if (response[4] == 'O') {
-        r.status = OK;
-    } else if (response[4] == 'A') {
-        r.status = ACC;
-    } else if (response[4] == 'I') {
-        r.status = ILG;
-    } else if (response[4] == 'N') {
-        if (response[5] == 'O') {
-            r.status = NOK;
-        } else if (response[5] == 'L') {
-            r.status = NLG;
-        }
-    } else if (response[4] == 'R') {
-        if (response[6] == 'G') {
-            r.status = REG;
-        } else if (response[6] == 'F') {
-            r.status = REF;
-        }
-    } else if (response[4] == 'E') {
-        if (response[5] == 'A') {
-            r.status = EAU;
-        } else if (response[5] == 'O') {
-            r.status = EOW;
-        } else if (response[5] == 'N') {
-            r.status = END;
-        }
-    } else if (response[4] == 'U') {
-        r.status = UNR;
-    } else {
-        cerr << "Invalid response: " << response << endl;
         return {};
     }
 
@@ -131,23 +84,14 @@ optional<Response> parse_response(const string &response, const string type) {
 
 optional<Response> send_udp_command(const string &command, Connections conns,
                                     const string &type) {
-    auto n = sendto(conns.udp.fd, command.c_str(), command.size(), 0,
-                    conns.udp.addr->ai_addr, conns.udp.addr->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error sending message to AS." << endl;
-        cerr << "Error: " << strerror(errno) << endl;
+    if (!send_udp(command, conns)) {
         return {};
     }
-
-    char buffer[6000];
-    n = recvfrom(conns.udp.fd, buffer, 6000, 0, conns.udp.addr->ai_addr,
-                 &conns.udp.addr->ai_addrlen);
-    if (n == -1) {
-        cerr << "Error receiving message from AS." << endl;
+    auto res = receive_udp(conns);
+    if (!res) {
         return {};
     }
-
-    return parse_response(buffer, type);
+    return parse_response(res.value(), type);
 }
 
 optional<Response> send_tcp_command(const string &command, Connections conns,
@@ -228,12 +172,12 @@ optional<User> login(vector<string> &args, Connections conns) {
     }
     auto status = response->status;
 
-    if (status == OK) {
+    if (status == "OK") {
         cout << "successful login" << endl;
         return User{uid, password};
-    } else if (status == NOK) {
+    } else if (status == "NOK") {
         cout << "incorrect login" << endl;
-    } else if (status == REG) {
+    } else if (status == "REG") {
         cout << "new user registered" << endl;
         return User{uid, password};
     } else {
@@ -254,12 +198,12 @@ void logout(vector<string> &args, Connections conns, optional<User> &user) {
     }
     auto status = response->status;
 
-    if (status == OK) {
+    if (status == "OK") {
         cout << "successful logout" << endl;
         user = {};
-    } else if (status == NOK) {
+    } else if (status == "NOK") {
         cout << "user not logged in" << endl;
-    } else if (status == UNR) {
+    } else if (status == "UNR") {
         cout << "unknown user" << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;
@@ -278,12 +222,12 @@ void unregister(vector<string> &args, Connections conns, optional<User> &user) {
     }
     auto status = response->status;
 
-    if (status == OK) {
+    if (status == "OK") {
         cout << "successful unregister" << endl;
         user = {};
-    } else if (status == NOK) {
+    } else if (status == "NOK") {
         cout << "user not logged in" << endl;
-    } else if (status == UNR) {
+    } else if (status == "UNR") {
         cout << "unknown user" << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;
@@ -333,9 +277,9 @@ void list(vector<string> &args, Connections conns) {
     }
 
     auto status = response->status;
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "no auctions are currently active" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         auto auctions = parse_listed_auctions(response->message);
         print_auctions(auctions);
     } else {
@@ -357,9 +301,9 @@ void list_my_auctions(vector<string> &args, Connections conns,
 
     auto status = response->status;
 
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "no auctions are currently active" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         auto auctions = parse_listed_auctions(response->message);
         print_auctions(auctions);
     } else {
@@ -431,9 +375,9 @@ void show_record(vector<string> &args, Connections conns) {
     }
     auto status = response->status;
 
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "auction not found" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         auto info = parse_auction_info(response->message);
         if (!info) {
             cerr << "Error parsing auction info." << endl;
@@ -496,9 +440,9 @@ void show_asset(vector<string> &args, Connections conns) {
     }
 
     auto status = response->status;
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "auction not found" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         auto asset = parse_asset(response->message);
         if (!asset) {
             cerr << "Error parsing asset." << endl;
@@ -525,11 +469,11 @@ void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
 
     auto status = response->status;
 
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "no ongoing bids" << endl;
-    } else if (status == NLG) {
+    } else if (status == "NLG") {
         cout << "user not logged in" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         auto auctions = parse_listed_auctions(response->message);
         print_auctions(auctions);
     } else {
@@ -564,7 +508,8 @@ optional<File> get_file_info(const string &fname) {
     return File{fname, size, data};
 }
 
-void open_asset(vector<string> &args, Connections conns, optional<User> &user) {
+void open_auction(vector<string> &args, Connections conns,
+                  optional<User> &user) {
     if (!validate_args(args, 4)) {
         return;
     }
@@ -596,11 +541,11 @@ void open_asset(vector<string> &args, Connections conns, optional<User> &user) {
 
     auto status = response->status;
     auto aid = response->message;
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "auction could not be started" << endl;
-    } else if (status == NLG) {
+    } else if (status == "NLG") {
         cout << "user not logged in" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         cout << "auction started" << endl;
         cout << "AID: " << aid << endl;
     } else {
@@ -624,15 +569,15 @@ void bid(vector<string> &args, Connections conns, optional<User> &user) {
     }
 
     auto status = response->status;
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "auction not active" << endl;
-    } else if (status == NLG) {
+    } else if (status == "NLG") {
         cout << "user not logged in" << endl;
-    } else if (status == REF) {
+    } else if (status == "REF") {
         cout << "larger bid has already been placed before" << endl;
-    } else if (status == ILG) {
+    } else if (status == "ILG") {
         cout << "not allowed to bid on your own auction" << endl;
-    } else if (status == ACC) {
+    } else if (status == "ACC") {
         cout << "bid accepted" << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;
@@ -654,17 +599,17 @@ void close(vector<string> &args, Connections conns, optional<User> &user) {
     }
 
     auto status = response->status;
-    if (status == NOK) {
+    if (status == "NOK") {
         cout << "auction could not be closed" << endl;
-    } else if (status == NLG) {
+    } else if (status == "NLG") {
         cout << "user not logged in" << endl;
-    } else if (status == OK) {
+    } else if (status == "OK") {
         cout << "auction closed" << endl;
-    } else if (status == EAU) {
+    } else if (status == "EAU") {
         cout << "auction does not exist" << endl;
-    } else if (status == EOW) {
+    } else if (status == "EOW") {
         cout << "auction is not owned by user" << endl;
-    } else if (status == END) {
+    } else if (status == "END") {
         cout << "auction has already finished" << endl;
     } else {
         cerr << "Unexpected response status: " << status << endl;

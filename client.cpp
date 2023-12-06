@@ -67,23 +67,12 @@ int main(int argc, char *argv[]) {
 
     cout << "Connecting to UDP server..." << endl;
 
-    // Create a UDP socket
-    connections.udp.fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (connections.udp.fd == -1)
-        exit(1);
-
     // Configure udp server address
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
-    // Use getaddrinfo to obtain address information
-    int errcode =
-        getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.udp.addr));
-    if (errcode != 0) {
-        cerr << "An error occured: " << gai_strerror(errcode) << endl;
-        exit(1);
-    }
+    connections.udp = init_udp_connection(hints, args.ASIP, args.ASport);
 
     cout << "Connecting to TCP server..." << endl;
 
@@ -93,7 +82,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM;
 
     // Use getaddrinfo to obtain address information
-    errcode =
+    int errcode =
         getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.tcp.addr));
     if (errcode != 0) {
         cerr << "An error occured: " << gai_strerror(errcode) << endl;
@@ -124,7 +113,7 @@ int main(int argc, char *argv[]) {
         } else if (cmd.name == "mybids" || cmd.name == "mb") {
             my_bids(cmd.args, connections, user);
         } else if (cmd.name == "open") {
-            open_asset(cmd.args, connections, user);
+            open_auction(cmd.args, connections, user);
         } else if (cmd.name == "close") {
             close(cmd.args, connections, user);
         } else if (cmd.name == "bid" || cmd.name == "b") {

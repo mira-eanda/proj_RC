@@ -5,10 +5,10 @@ default: all
 
 all: client server
 
-client: client.cpp commands.hpp
+client: client.cpp commands.hpp common.hpp
 	$(CC) $(CFLAGS) -o client client.cpp
 
-server: server.cpp
+server: server.cpp common.hpp
 	$(CC) $(CFLAGS) -o server server.cpp
 
 clean:
