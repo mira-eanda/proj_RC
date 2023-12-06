@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include "commands.h"
+#include "commands.hpp"
 
 using namespace std;
 
@@ -38,17 +38,17 @@ Arguments parse_arguments(int argc, char *argv[]) {
 }
 
 struct Command {
-    std::string name;
-    std::vector<std::string> args;
+    string name;
+    vector<string> args;
 };
 
-Command parse_command(const std::string &input) {
+Command parse_command(const string &input) {
     Command command;
 
-    std::istringstream iss(input);
+    istringstream iss(input);
     iss >> command.name;
 
-    std::string arg;
+    string arg;
     while (iss >> arg) {
         command.args.push_back(arg);
     }
@@ -60,10 +60,8 @@ int main(int argc, char *argv[]) {
 
     auto args = parse_arguments(argc, argv);
 
-    int errcode;
-    struct addrinfo hints;
-    char buffer[128];
-    Connections connections;
+    addrinfo hints{};
+    Connections connections{};
 
     optional<User> user = {};
 
@@ -80,7 +78,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_DGRAM;
 
     // Use getaddrinfo to obtain address information
-    errcode =
+    int errcode =
         getaddrinfo(args.ASIP, args.ASport, &hints, &(connections.udp.addr));
     if (errcode != 0) {
         cerr << "An error occured: " << gai_strerror(errcode) << endl;
@@ -105,12 +103,13 @@ int main(int argc, char *argv[]) {
     cout << "\e[1;1H\e[2J";
     cout << "Welcome to the RC Auctions!" << endl;
 
+    string line;
     // Wait for user input and process command
     while (1) {
         cout << "> ";
-        cin.getline(buffer, 128);
+        getline(cin, line);
 
-        auto cmd = parse_command(buffer);
+        auto cmd = parse_command(line);
 
         if (cmd.name == "login") {
             user = login(cmd.args, connections);
@@ -125,7 +124,7 @@ int main(int argc, char *argv[]) {
         } else if (cmd.name == "mybids" || cmd.name == "mb") {
             my_bids(cmd.args, connections, user);
         } else if (cmd.name == "open") {
-            open(cmd.args, connections, user);
+            open_asset(cmd.args, connections, user);
         } else if (cmd.name == "close") {
             close(cmd.args, connections, user);
         } else if (cmd.name == "bid" || cmd.name == "b") {

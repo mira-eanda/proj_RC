@@ -17,12 +17,14 @@
 
 using namespace std;
 
-#define NAME_SIZE 10
-#define NAME_ERROR "name must be up to 10 alphanumeric characters long."
-#define START_VALUE_SIZE 6
-#define START_VALUE_ERROR "start_value must be up to 6 digits long."
-#define TIMEACTIVE_SIZE 5
-#define TIMEACTIVE_ERROR "timeactive must be up to 5 digits long."
+constexpr auto NAME_SIZE = 10;
+constexpr auto NAME_ERROR =
+    "name must be up to 10 alphanumeric characters long.";
+constexpr auto START_VALUE_SIZE = 6;
+constexpr auto START_VALUE_ERROR = "start_value must be up to 6 digits long.";
+constexpr auto TIMEACTIVE_SIZE = 5;
+constexpr auto TIMEACTIVE_ERROR = "timeactive must be up to 5 digits long.";
+constexpr auto MAX_BIDS = 50;
 
 struct UDPConnection {
     int fd;
@@ -41,7 +43,7 @@ struct Connections {
 constexpr int MAX_UID = 6;
 constexpr int MAX_PASSWORD = 8;
 
-enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END, REF, ILG, ACC};
+enum status_t { OK, NOK, REG, UNR, NLG, EAU, EOW, END, REF, ILG, ACC };
 
 struct Response {
     string type;
@@ -449,8 +451,8 @@ void show_record(vector<string> &args, Connections conns) {
             cout << "end_date_time: " << info->end->end_date_time << endl;
             cout << "end_sec_time: " << info->end->end_sec_time << endl;
         }
-        
-        for (size_t i = 0; i < info->bids.size() && i < 50; i++) {
+
+        for (size_t i = 0; i < info->bids.size() && i < MAX_BIDS; i++) {
             auto bid = info->bids[i];
             cout << "--- Bid info ---" << endl;
             cout << "bidder_UID: " << bid.bidder_UID << endl;
@@ -535,9 +537,11 @@ void my_bids(vector<string> &args, Connections conns, optional<User> &user) {
     }
 }
 
-bool validate_input(const std::string& input, size_t max_length, const std::string& allowed_chars, 
-    const std::string& error_message) {
-    if (input.size() > max_length || input.find_first_not_of(allowed_chars) != std::string::npos) {
+bool validate_input(const std::string &input, size_t max_length,
+                    const std::string &allowed_chars,
+                    const std::string &error_message) {
+    if (input.size() > max_length ||
+        input.find_first_not_of(allowed_chars) != std::string::npos) {
         std::cerr << error_message << std::endl;
         return false;
     }
@@ -560,7 +564,7 @@ optional<File> get_file_info(const string &fname) {
     return File{fname, size, data};
 }
 
-void open(vector<string> &args, Connections conns, optional<User> &user) {
+void open_asset(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 4)) {
         return;
     }
@@ -572,8 +576,10 @@ void open(vector<string> &args, Connections conns, optional<User> &user) {
     auto timeactive = args[3];
 
     if (!validate_input(name, NAME_SIZE, alphanumeric, NAME_ERROR) ||
-        !validate_input(start_value, START_VALUE_SIZE, numeric, START_VALUE_ERROR) ||
-        !validate_input(timeactive, TIMEACTIVE_SIZE, numeric, TIMEACTIVE_ERROR)) {
+        !validate_input(start_value, START_VALUE_SIZE, numeric,
+                        START_VALUE_ERROR) ||
+        !validate_input(timeactive, TIMEACTIVE_SIZE, numeric,
+                        TIMEACTIVE_ERROR)) {
         return;
     }
 
@@ -633,20 +639,20 @@ void bid(vector<string> &args, Connections conns, optional<User> &user) {
     }
 }
 
-void close(vector<string> &args, Connections conns, optional<User> &user){
+void close(vector<string> &args, Connections conns, optional<User> &user) {
     if (!validate_args(args, 1) || !validate_auth(user)) {
         return;
     }
-    
+
     auto aid = args[0];
-    
-    auto message = "CLS " +  user->uid + " " + user->password + " " + aid + "\n";
+
+    auto message = "CLS " + user->uid + " " + user->password + " " + aid + "\n";
 
     auto response = send_tcp_command(message, conns, "RCL");
     if (!response) {
         return;
     }
-    
+
     auto status = response->status;
     if (status == NOK) {
         cout << "auction could not be closed" << endl;

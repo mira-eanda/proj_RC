@@ -5,7 +5,7 @@ default: all
 
 all: client server
 
-client: client.cpp commands.h
+client: client.cpp commands.hpp
 	$(CC) $(CFLAGS) -o client client.cpp
 
 server: server.cpp
