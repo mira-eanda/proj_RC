@@ -109,6 +109,8 @@ int main(int argc, char *argv[]) {
                         handle_login(req, conns, db);
                     } else if (req.type == "LOU") {
                         handle_logout(req, conns, db);
+                    } else if (req.type == "UNR") {
+                        handle_unregister(req, conns, db);
                     }
                 }
             }

@@ -100,6 +100,14 @@ class Database {
         store_database();
     }
 
+    void delete_user(const string &uid) {
+        if (data.users.find(uid) == data.users.end()) {
+            return;
+        }
+        data.users.erase(uid);
+        store_database();
+    }
+
     optional<User> get_user(const string &uid) {
         if (data.users.find(uid) == data.users.end()) {
             return {};

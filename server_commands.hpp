@@ -70,4 +70,22 @@ void handle_logout(const Request &req, Connections conns, Database *db) {
         send_udp("ERR: invalid user\n", conns);
     }
 }
+
+void handle_unregister(const Request &req, Connections conns, Database *db) {
+    auto user = parse_user(req.message);
+    if (user.has_value()) {
+        cout << "User " << user.value().uid << " unregistered." << endl;
+        if (db->validate_user(user.value())) {
+            db->delete_user(user.value().uid);
+            send_udp("RUR OK\n", conns);
+        } else {
+            cout << "Unknown user." << endl;
+            send_udp("RUR UNR\n", conns);
+        }
+    } else {
+        cout << "Invalid user." << endl;
+        send_udp("ERR: invalid user\n", conns);
+    }
+}
+
 #endif
