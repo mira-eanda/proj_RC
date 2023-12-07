@@ -51,6 +51,11 @@ struct File {
     string data;
 };
 
+struct User {
+    string uid;
+    string password;
+};
+
 bool validate_args(const vector<string> &args, int expected) {
     if (args.size() != expected) {
         cerr << "Invalid number of args for command." << std::endl;

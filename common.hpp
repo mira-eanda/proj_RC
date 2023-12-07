@@ -10,28 +10,6 @@
 
 using namespace std;
 
-class User {
-  public:
-    string uid;
-    string password;
-    bool logged_in = false;
-
-    string serialize() const {
-        stringstream ss;
-        ss << uid << ' ' << password << ' ' << logged_in;
-        return ss.str();
-    }
-
-    static User deserialize(const string &str) {
-        User user;
-        stringstream ss(str);
-        string logged_in;
-        ss >> user.uid >> user.password >> logged_in;
-        user.logged_in = logged_in == "1";
-        return user;
-    }
-};
-
 struct UDPConnection {
     int fd;
     struct addrinfo *addr;
