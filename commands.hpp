@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include <sys/sendfile.h>
 
 #include "common.hpp"
 
@@ -48,7 +49,7 @@ struct Auction {
 struct File {
     string name;
     long int size;
-    string data;
+    // string data;
 };
 
 struct User {
@@ -508,10 +509,12 @@ optional<File> get_file_info(const string &fname) {
     auto size = file.tellg();
     file.seekg(0, ios::beg);
 
+    /*
     auto data = string(size, ' ');
     file.read(&data[0], size);
+    */
 
-    return File{fname, size, data};
+    return File{fname, size};
 }
 
 void open_auction(vector<string> &args, Connections conns,
@@ -535,15 +538,31 @@ void open_auction(vector<string> &args, Connections conns,
     }
 
     auto file = get_file_info(asset_fname);
+    if (!file) {
+        return;
+    }
+    int file_fd = open(asset_fname.c_str(), O_RDONLY);
+    if (file_fd == -1) {
+        cerr << "Error opening file: " << asset_fname << endl;
+        return;
+    }
 
     // OPA UID password name start_value timeactive Fname Fsize Fdata
     auto message = "OPA " + user->uid + " " + user->password + " " + name +
                    " " + start_value + " " + timeactive + " " + file->name +
-                   " " + to_string(file->size) + " " + file->data + "\n";
-    auto response = send_tcp_command(message, conns, "ROA");
-    if (!response) {
+                   " " + to_string(file->size) + " ";
+    
+    int fd = init_tcp_connection(conns);
+
+    send_tcp(message, conns, fd);
+    sendfile(fd, file_fd, 0, file->size);
+    send_tcp("\n", conns, fd);
+
+    auto res = receive_tcp(conns, fd);
+    if (!res) {
         return;
     }
+    auto response = parse_response(res.value(), "ROA");    
 
     auto status = response->status;
     auto aid = response->message;

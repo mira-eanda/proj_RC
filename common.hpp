@@ -59,4 +59,49 @@ UDPConnection init_udp_connection(addrinfo hints, const char *IP,
     }
     return udp;
 }
+
+int init_tcp_connection(Connections conns) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        cerr << "Error creating socket." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+        exit(1);
+    }
+
+    auto n = connect(fd, conns.tcp.addr->ai_addr, conns.tcp.addr->ai_addrlen);
+    if (n == -1) {
+        cerr << "Error connecting to AS." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+        return -1;
+    }
+    return fd;
+}
+
+bool send_tcp(const string &command, Connections conns, int fd) {
+    auto n = write(fd, command.c_str(), command.size());
+    if (n == -1) {
+        cerr << "Error sending message to AS." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+    }
+    return n != -1;
+}
+
+optional <string> receive_tcp(Connections conns, int fd) {
+    int n;
+    string data;
+    char buffer[128];
+    while(true) {
+        n = read(fd, buffer, 128);
+        if (n == -1) {
+            cerr << "Error receiving message from AS." << endl;
+            cerr << "Error: " << strerror(errno) << endl;
+            return {};
+        }
+        if (n == 0) {
+            break;
+        }
+        data += string(buffer, n);
+    }
+    return data;
+}
 #endif
