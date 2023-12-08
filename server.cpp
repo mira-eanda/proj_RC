@@ -111,6 +111,10 @@ int main(int argc, char *argv[]) {
                         handle_logout(req, conns, db);
                     } else if (req.type == "UNR") {
                         handle_unregister(req, conns, db);
+                    } else if (req.type == "LMA") {
+                        handle_my_auctions(req, conns, db);
+                    } else if (req.type == "SRC") {
+                        handle_show_record(req, conns, db);
                     }
                 }
             }

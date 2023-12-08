@@ -44,6 +44,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in);
 struct Bid {
     string uid;
     int value;
+    string bid_date_time;
+    int bid_sec_time;
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, uid, value);
@@ -56,13 +58,15 @@ struct End {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(End, end_date_time, end_sec_time);
 
 struct Auction {
+    string aid;
     string uid;
     string auction_name;
     string asset_fname;
     int start_value;
     string start_date_time;
     int timeactive;
-    vector<string> bids;
+    bool open = false;
+    vector<Bid> bids;
     optional<End> end;
 };
 
@@ -122,6 +126,28 @@ class Database {
         return data.users[user.uid].password == user.password;
     }
 
+    void add_auction(const Auction &auction) {
+        data.auctions[auction.aid] = auction;
+        store_database();
+    }
+
+    vector<Auction> get_auctions_by_user(const string &uid) {
+        vector<Auction> auctions;
+        for (auto auction : data.auctions) {
+            if (auction.second.uid == uid) {
+                auctions.push_back(auction.second);
+            }
+        }
+        return auctions;
+    }
+
+    optional<Auction> get_auction(const string &aid) {
+        if (data.auctions.find(aid) == data.auctions.end()) {
+            return {};
+        }
+        return data.auctions[aid];
+    }
+    
   private:
     Data data;
     const string filename = SAVE_FILE;

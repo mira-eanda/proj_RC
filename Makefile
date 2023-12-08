@@ -8,8 +8,8 @@ all: client server
 client: client.cpp commands.hpp common.hpp
 	$(CC) $(CFLAGS) -o client client.cpp
 
-server: server.cpp common.hpp database.hpp
+server: server.cpp common.hpp database.hpp	server_commands.hpp
 	$(CC) $(CFLAGS) -o server server.cpp
 
 clean:
-	$(RM) client
+	$(RM) client server
