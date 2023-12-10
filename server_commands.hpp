@@ -104,7 +104,6 @@ void handle_list(const Request &req, Connections conns, Database *db) {
             msg += " " + auction.aid + " " + to_string(auction.open);
         }
         msg += "\n";
-        cout << "msg: " << msg << endl;
         send_udp(msg, conns);
     }
 }
@@ -139,22 +138,23 @@ void handle_my_auctions(const Request &req, Connections conns, Database *db) {
 
 
 
-void send_auction_record(const Auction &auction, Connections conns) {
+void send_auction_record(const Auction &auction, Connections conns, Database *db) {
     string msg = "RRC OK " + auction.uid + " " + auction.auction_name + " " + 
         auction.asset_fname + " " + to_string(auction.start_value) + " " +
         auction.start_date_time + " " + to_string(auction.timeactive) + "\n";
     
-    if (auction.bids.size() > 0) {
-        //sort
-        for (auto bid : auction.bids) {
+    auto bids = db->get_bids_of_auction(auction.aid);
+    if (bids.size() > 0) {
+        for (auto bid : bids) {
             msg += "B " + bid.uid + " " + to_string(bid.value) + " " + 
                 bid.bid_date_time + " " + to_string(bid.bid_sec_time) + "\n";
         }
     }
+
     if (!(auction.open)) {
         msg += "E " + auction.end->end_date_time + " " + to_string(auction.end->end_sec_time) + "\n";
     }
-    cout << "msg: " << msg << endl;
+    // cout << "msg: " << msg << endl;
     send_udp(msg, conns);
 }
 
@@ -182,7 +182,7 @@ void handle_show_record(const Request &req, Connections conns, Database *db) {
     auto auction = db->get_auction(auc.value().aid);
     if (auction.has_value()) {
         cout << "Auction found." << endl;
-        send_auction_record(auction.value(), conns);
+        send_auction_record(auction.value(), conns, db);
     } else {
         send_udp("RRC NOK\n", conns);
     }

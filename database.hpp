@@ -43,6 +43,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in);
 
 struct Bid {
     string uid;
+    string aid;
     int value;
     string bid_date_time;
     int bid_sec_time;
@@ -66,7 +67,7 @@ struct Auction {
     string start_date_time;
     int timeactive;
     bool open = false;
-    vector<Bid> bids;
+    vector<string> bids;
     optional<End> end;
 };
 
@@ -154,6 +155,23 @@ class Database {
             auctions.push_back(auction.second);
         }
         return auctions;
+    }
+
+    void add_bid(const Bid &bid) {
+        data.bids[to_string(bid.value)] = bid;
+        store_database();
+    }
+
+    vector<Bid> get_bids_of_auction(const string &aid) {
+        vector<Bid> bids;
+        for (auto bid : data.bids) {
+            if (bid.second.aid == aid) {
+                bids.push_back(bid.second);
+            }
+        }
+        sort(bids.begin(), bids.end(),
+             [](const Bid &a, const Bid &b) { return a.value < b.value; });
+        return bids;
     }
     
   private:
