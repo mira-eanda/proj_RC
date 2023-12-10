@@ -94,6 +94,20 @@ void handle_unregister(const Request &req, Connections conns, Database *db) {
     }
 }
 
+void handle_list(const Request &req, Connections conns, Database *db) {
+    auto auctions = db->get_auctions();
+    if (auctions.size() == 0) {
+        send_udp("RLS NOK\n", conns);
+    } else {
+        string msg = "RLS OK";
+        for (auto auction : auctions) {
+            msg += " " + auction.aid + " " + to_string(auction.open);
+        }
+        msg += "\n";
+        cout << "msg: " << msg << endl;
+        send_udp(msg, conns);
+    }
+}
 
 void handle_my_auctions(const Request &req, Connections conns, Database *db) {
     auto u = parse_user(req.message);

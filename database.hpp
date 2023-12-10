@@ -147,6 +147,14 @@ class Database {
         }
         return data.auctions[aid];
     }
+
+    vector<Auction> get_auctions() {
+        vector<Auction> auctions;
+        for (auto auction : data.auctions) {
+            auctions.push_back(auction.second);
+        }
+        return auctions;
+    }
     
   private:
     Data data;
