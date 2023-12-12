@@ -62,15 +62,37 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    int tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (tcp_fd == -1) {
+        cerr << "Error creating socket." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+        exit(1);
+    }
+    cout << "Socket created." << endl;
+
+    if (bind(tcp_fd, conns.udp.addr->ai_addr, conns.udp.addr->ai_addrlen) ==
+        -1) {
+        cerr << "Bind error TCP server" << endl;
+        exit(1);
+    }
+
+    if (listen(tcp_fd, 5) == -1) {
+        perror("TCP listen failed");
+        exit(EXIT_FAILURE);
+    }
+
     FD_ZERO(&inputs);              // Clear input mask
     FD_SET(0, &inputs);            // Set standard input channel on
     FD_SET(conns.udp.fd, &inputs); // Set UDP channel on
+    FD_SET(tcp_fd, &inputs);       // Set TCP channel on
 
     string line;
     timeval timeout{};
 
     char host[NI_MAXHOST], service[NI_MAXSERV];
     auto db = new Database();
+
+    int max_fd = max(conns.udp.fd, tcp_fd);
 
     while (1) {
         testfds = inputs; // Reload mask
@@ -80,7 +102,7 @@ int main(int argc, char *argv[]) {
 
         switch (out_fds) {
         case 0:
-            cout << "Timeout" << endl;
+            // cout << "Timeout" << endl;
             break;
         case -1:
             cerr << "Select error" << endl;
@@ -90,7 +112,11 @@ int main(int argc, char *argv[]) {
                 getline(cin, line);
                 if (line == "exit") {
                     cout << "Exiting..." << endl;
-                    exit(0);
+
+                    freeaddrinfo(conns.udp.addr);
+                    close(conns.udp.fd);
+                    close(tcp_fd);
+                    return 0;
                 }
             }
             if (FD_ISSET(conns.udp.fd, &testfds)) {
@@ -121,6 +147,38 @@ int main(int argc, char *argv[]) {
                     } else if (req.type == "SRC") {
                         handle_show_record(req, conns, db);
                     }
+                }
+            }
+            if (FD_ISSET(tcp_fd, &testfds)) {
+                cout << "Accepting connection " << tcp_fd << endl;
+                sockaddr addr;
+                socklen_t addrlen;
+                int clientSocket = accept(tcp_fd, &addr, &addrlen);
+
+                if (clientSocket == -1) {
+                    perror("Error accepting TCP connection");
+                } else {
+                    if (args.verbose &&
+                        getnameinfo(&addr, addrlen, host, sizeof host, service,
+                                    sizeof service, 0) == 0) {
+                        cout << "Accepted connection from [" << host << ":"
+                             << service << "]" << endl;
+                    }
+                    FD_SET(clientSocket, &inputs);
+                    max_fd = max(max_fd, clientSocket + 1);
+                }
+            }
+            for (int i = tcp_fd + 1; i < max_fd; ++i) {
+                if (FD_ISSET(i, &testfds)) {
+                    char buffer[128];
+                    int n = read(i, buffer, 128);
+                    if (n == -1) {
+                        cerr << "Error: " << strerror(errno) << endl;
+                        return {};
+                    }
+                    cout << "Received: " << buffer << endl;
+                    close(i);
+                    FD_CLR(i, &inputs);
                 }
             }
         }

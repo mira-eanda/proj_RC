@@ -86,7 +86,7 @@ bool send_tcp(const string &command, Connections conns, int fd) {
     return n != -1;
 }
 
-optional <string> receive_tcp(Connections conns, int fd) {
+optional <string> receive_tcp(int fd) {
     int n;
     string data;
     char buffer[128];
