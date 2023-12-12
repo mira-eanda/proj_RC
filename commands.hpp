@@ -558,7 +558,7 @@ void open_auction(vector<string> &args, Connections conns,
     sendfile(fd, file_fd, 0, file->size);
     send_tcp("\n", conns, fd);
 
-    auto res = receive_tcp(conns, fd);
+    auto res = receive_tcp(fd);
     if (!res) {
         return;
     }
