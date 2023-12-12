@@ -136,6 +136,34 @@ void handle_my_auctions(const Request &req, Connections conns, Database *db) {
     }
 }
 
+void handle_my_bids(const Request &req, Connections conns, Database *db) {
+    auto u = parse_user(req.message);
+
+    if (u.has_value()) {
+        cout << "User " << u.value().uid << " requested their bids." << endl;
+        auto user = db->get_user(u.value().uid);
+        if (db->validate_user(user.value())) {
+            auto bids = db->get_bids_by_user(user.value().uid);
+            if (bids.size() == 0) {
+                send_udp("RMB NOK\n", conns);
+            } else {
+                string msg = "RMB OK";
+                for (auto bid : bids) {
+                    msg += " " + bid.aid + " " + to_string(db->check_auction_open(bid.aid));
+                }
+                msg += "\n";
+                send_udp(msg, conns);
+            }
+        } else {
+            cout << "Unknown user." << endl;
+            send_udp("RMB NLG\n", conns);
+        }
+    } else {
+        cout << "Invalid user." << endl;
+        send_udp("ERR: invalid user\n", conns);
+    }
+
+}
 
 
 void send_auction_record(const Auction &auction, Connections conns, Database *db) {
@@ -143,7 +171,7 @@ void send_auction_record(const Auction &auction, Connections conns, Database *db
         auction.asset_fname + " " + to_string(auction.start_value) + " " +
         auction.start_date_time + " " + to_string(auction.timeactive) + "\n";
     
-    auto bids = db->get_bids_of_auction(auction.aid);
+    auto bids = db->get_bids_of_auction(auction);
     if (bids.size() > 0) {
         for (auto bid : bids) {
             msg += "B " + bid.uid + " " + to_string(bid.value) + " " + 

@@ -31,16 +31,6 @@ template <typename T> struct adl_serializer<optional<T>> {
 };
 } // namespace nlohmann
 
-struct User {
-    string uid;
-    string password;
-    bool logged_in = false;
-    vector<string> auctions;
-    vector<string> bids;
-};
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in);
-
 struct Bid {
     string uid;
     string aid;
@@ -49,7 +39,17 @@ struct Bid {
     int bid_sec_time;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, uid, value);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, aid, value);
+
+struct User {
+    string uid;
+    string password;
+    bool logged_in = false;
+    vector<string> host_auctions;
+    vector<Bid> bids;
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in);
 
 struct End {
     string end_date_time;
@@ -67,7 +67,7 @@ struct Auction {
     string start_date_time;
     int timeactive;
     bool open = false;
-    vector<string> bids;
+    vector<Bid> bids;
     optional<End> end;
 };
 
@@ -157,23 +157,35 @@ class Database {
         return auctions;
     }
 
-    void add_bid(const Bid &bid) {
-        data.bids[to_string(bid.value)] = bid;
-        store_database();
+    bool check_auction_open(const string &aid) {
+        auto auction = get_auction(aid);
+        return auction.value().open;
     }
 
-    vector<Bid> get_bids_of_auction(const string &aid) {
+    vector<Bid> get_bids_of_auction(Auction auction) {
         vector<Bid> bids;
-        for (auto bid : data.bids) {
-            if (bid.second.aid == aid) {
-                bids.push_back(bid.second);
-            }
+        for (auto bid : auction.bids) {
+            bids.push_back(bid);
         }
         sort(bids.begin(), bids.end(),
              [](const Bid &a, const Bid &b) { return a.value < b.value; });
         return bids;
     }
     
+    vector<Bid> get_bids_by_user(const string &uid) {
+        auto user = get_user(uid);
+        vector<Bid> bids;
+        for (auto bid : user.value().bids) {
+            bids.push_back(bid);
+        }
+        return bids;
+    }
+
+    void add_bid_to_user(const Bid &bid, const string &uid) {
+        data.users[uid].bids.push_back(bid);
+        data.auctions[bid.aid].bids.push_back(bid);
+    }
+        
   private:
     Data data;
     const string filename = SAVE_FILE;
