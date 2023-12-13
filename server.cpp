@@ -145,6 +145,8 @@ int main(int argc, char *argv[]) {
                         handle_my_bids(req, conns, db);
                     } else if (req.type == "SRC") {
                         handle_show_record(req, conns, db);
+                    } else if (req.type == "OPA") {
+                        handle_open(req, conns, db);
                     }
                 }
             }

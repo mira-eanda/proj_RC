@@ -64,6 +64,7 @@ struct Auction {
     string uid;
     string auction_name;
     string asset_fname;
+    int asset_fsize;
     int start_value;
     string start_date_time;
     int timeactive;
@@ -187,6 +188,19 @@ class Database {
         data.auctions[bid.aid].bids.push_back(bid);
         store_database();
     }
+
+    string generate_aid() {
+        int max_aid = 0;
+        for (const auto& auction_pair : data.auctions) {
+            int aid = stoi(auction_pair.first);
+            max_aid = max(max_aid, aid);
+        }
+        max_aid++;
+
+        stringstream ss;
+        ss << setw(3) << setfill('0') << max_aid;
+        return ss.str();
+    } 
         
   private:
     Data data;

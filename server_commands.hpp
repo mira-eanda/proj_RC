@@ -216,4 +216,68 @@ void handle_show_record(const Request &req, Connections conns, Database *db) {
     }
 }
 
+optional<Auction> parse_open_message(const string &input) {
+    Auction auction;
+    string password;
+
+    istringstream iss(input);
+    iss >> auction.uid;
+    iss >> password;
+    iss >> auction.auction_name;
+    iss >> auction.start_value;
+    iss >> auction.timeactive;
+    iss >> auction.asset_fname;
+    iss >> auction.asset_fsize;
+
+    vector<char> file_data(auction.asset_fsize);
+    iss.read(file_data.data(), auction.asset_fsize);
+
+    ofstream file(auction.asset_fname, ios::binary);
+    file.write(file_data.data(), file_data.size());
+    file.close();
+
+    return auction;    
+}
+
+string get_current_time() {
+    time_t now = time(0);
+    tm *ltm = localtime(&now);
+    string time = to_string(1900 + ltm->tm_year) + "-" + to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday) + " " + to_string(ltm->tm_hour) + ":" + to_string(ltm->tm_min) + ":" + to_string(ltm->tm_sec);
+    return time;
+}
+
+void handle_open(const Request &req, Connections conns, Database *db) {
+    auto user = parse_user(req.message);
+    
+    if (user.has_value()) {
+        cout << "User " << user.value().uid << " requested to open an auction." << endl;
+        auto db_user = db->get_user(user.value().uid);
+        if (db->validate_user(db_user.value())) {
+            //parse the rest of the request
+            auto auction = parse_open_message(req.message);
+            if (auction.has_value()) {
+                auction.value().aid = db->generate_aid();
+                auction.value().open = true;
+                auction.value().start_date_time = get_current_time();
+                auction.value().end = {};
+                auction.value().bids = {};
+
+                db -> add_auction(auction.value());
+                cout << "Auction " << auction.value().aid << " opened." << endl;
+                send_udp("ROA OK " + auction.value().aid + "\n", conns);
+            } else {
+                cout << "Auction could not be started" << endl;
+                send_udp("ROA NOK\n", conns);
+            } 
+        } else {
+            cout << "User not logged in." << endl;
+            send_udp("ROA NLG\n", conns);
+        }
+    } else { 
+        cout << "Invalid user." << endl;
+        send_udp("ERR: invalid user\n", conns);
+    }
+
+}
+
 #endif
