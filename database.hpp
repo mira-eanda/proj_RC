@@ -49,7 +49,8 @@ struct User {
     vector<Bid> bids;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in, host_auctions,
+                                   bids);
 
 struct End {
     string end_date_time;
@@ -72,7 +73,7 @@ struct Auction {
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, uid, auction_name, asset_fname,
-                                   start_value, start_date_time, timeactive,
+                                   start_value, start_date_time, timeactive, open,
                                    bids, end);
 
 struct Data {
@@ -184,6 +185,7 @@ class Database {
     void add_bid_to_user(const Bid &bid, const string &uid) {
         data.users[uid].bids.push_back(bid);
         data.auctions[bid.aid].bids.push_back(bid);
+        store_database();
     }
         
   private:
