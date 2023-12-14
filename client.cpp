@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "commands.hpp"
+#include "deps/linenoise.hpp"
 
 using namespace std;
 
@@ -92,12 +93,10 @@ int main(int argc, char *argv[]) {
     cout << "\e[1;1H\e[2J";
     cout << "Welcome to the RC Auctions!" << endl;
 
-    string line;
-    // Wait for user input and process command
-    while (1) {
-        cout << "> ";
-        getline(cin, line);
-
+    linenoise::SetHistoryMaxLen(100);
+    while (true) {
+        string line;
+        auto exit = linenoise::Readline("> ", line);
         auto cmd = parse_command(line);
 
         if (cmd.name == "login") {
@@ -122,11 +121,12 @@ int main(int argc, char *argv[]) {
             logout(cmd.args, connections, user);
         } else if (cmd.name == "unregister") {
             unregister(cmd.args, connections, user);
-        } else if (cmd.name == "exit") {
+        } else if (cmd.name == "exit" || exit) {
             exit_cli(cmd.args, connections, user);
         } else {
             cout << "Unknown command." << endl;
         }
+        linenoise::AddHistory(line.c_str());
     }
 
     freeaddrinfo(connections.udp.addr);
