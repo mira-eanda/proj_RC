@@ -223,25 +223,15 @@ void handle_show_record(const Request &req, Connections conns, Database *db) {
     }
 }
 
-optional<Auction> parse_open_message(const string &input) {
+optional<Auction> parse_open_message(istringstream &iss) {
     Auction auction;
     string password;
 
-    istringstream iss(input);
-    iss >> auction.uid;
-    iss >> password;
     iss >> auction.auction_name;
     iss >> auction.start_value;
     iss >> auction.timeactive;
     iss >> auction.asset_fname;
     iss >> auction.asset_fsize;
-
-    vector<char> file_data(auction.asset_fsize);
-    iss.read(file_data.data(), auction.asset_fsize);
-
-    ofstream file(auction.asset_fname, ios::binary);
-    file.write(file_data.data(), file_data.size());
-    file.close();
 
     return auction;
 }
@@ -266,15 +256,13 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    cout << "User " << user.value().uid << " requested to open an auction."
-         << endl;
-    auto db_user = db->get_user(user.value().uid);
+    cout << "User " << user->uid << " requested to open an auction." << endl;
+    auto db_user = db->get_user(user->uid);
     if (!db->validate_user(db_user.value())) {
-        cout << "User not logged in." << endl;
         send_tcp("ROA NLG\n", tcp_fd);
         return;
     }
-    auto auction = parse_open_message(req.message);
+    auto auction = parse_open_message(iss);
 
     if (!auction) {
         cout << "Auction could not be started." << endl;
@@ -282,15 +270,13 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    auction.value().aid = db->generate_aid();
-    auction.value().open = true;
-    auction.value().start_date_time = get_current_time();
-    auction.value().end = {};
-    auction.value().bids = {};
+    auction->uid = user->uid;
+    auction->aid = db->generate_aid();
+    auction->open = true;
+    auction->start_date_time = get_current_time();
 
     db->add_auction(auction.value());
-    cout << "Auction " << auction.value().aid << " opened." << endl;
-    send_tcp("ROA OK " + auction.value().aid + "\n", tcp_fd);
+    send_tcp("ROA OK " + auction->aid + "\n", tcp_fd);
 }
 
 void handle_close(const Request &req, int tcp_fd, Database *db) {
@@ -300,11 +286,13 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
 
     if (!user) {
         cout << "Invalid user." << endl;
-        send_tcp("ERR: invalid user\n", tcp_fd);
+        send_tcp("RCL NOK\n", tcp_fd);
         return;
     }
 
     iss >> aid;
+
+    cout << "Auction id: " << aid << endl;
 
     cout << "User " << user.value().uid << " requested to close an auction."
          << endl;
@@ -321,19 +309,19 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
 
     if (!auction) {
         cout << "Auction not found." << endl;
-        send_tcp("RCL NOK\n", tcp_fd);
+        send_tcp("RCL EAU\n", tcp_fd);
         return;
     }
 
     if (auction.value().uid != user.value().uid) {
         cout << "User does not own auction." << endl;
-        send_tcp("RCL NOK\n", tcp_fd);
+        send_tcp("RCL EOW\n", tcp_fd);
         return;
     }
 
     if (!auction.value().open) {
         cout << "Auction already closed." << endl;
-        send_tcp("RCL ACL\n", tcp_fd);
+        send_tcp("RCL END\n", tcp_fd);
         return;
     }
 

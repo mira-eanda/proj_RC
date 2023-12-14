@@ -73,7 +73,7 @@ struct Auction {
     optional<End> end;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, uid, auction_name, asset_fname,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, aid, uid, auction_name, asset_fname,
                                    start_value, start_date_time, timeactive, open,
                                    bids, end);
 
