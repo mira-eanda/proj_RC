@@ -188,6 +188,8 @@ int main(int argc, char *argv[]) {
                              << req.message << endl;
                         if (req.type == "OPA") {
                             handle_open(req, i, db);
+                        } else if (req.type == "CLS") {
+                            handle_close(req, i, db);
                         }
                     }
                     close(i);

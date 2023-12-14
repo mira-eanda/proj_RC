@@ -21,10 +21,9 @@ Request parse_request(const string &input) {
     return req;
 }
 
-optional<User> parse_user(const string &input) {
+optional<User> parse_user(istringstream &iss) {
     User user;
 
-    istringstream iss(input);
     iss >> user.uid;
 
     if (iss >> user.password) {
@@ -35,7 +34,8 @@ optional<User> parse_user(const string &input) {
 }
 
 void handle_login(Request &req, Connections conns, Database *db) {
-    auto user = parse_user(req.message);
+    istringstream iss(req.message);
+    auto user = parse_user(iss);
     if (user.has_value()) {
         cout << "User " << user.value().uid << " logged in." << endl;
 
@@ -60,7 +60,9 @@ void handle_login(Request &req, Connections conns, Database *db) {
 }
 
 void handle_logout(const Request &req, Connections conns, Database *db) {
-    auto user = parse_user(req.message);
+    istringstream iss(req.message);
+    auto user = parse_user(iss);
+
     if (user.has_value()) {
         cout << "User " << user.value().uid << " logged out." << endl;
         if (db->validate_user(user.value())) {
@@ -77,7 +79,8 @@ void handle_logout(const Request &req, Connections conns, Database *db) {
 }
 
 void handle_unregister(const Request &req, Connections conns, Database *db) {
-    auto user = parse_user(req.message);
+    istringstream iss(req.message);
+    auto user = parse_user(iss);
     if (user.has_value()) {
         cout << "User " << user.value().uid << " unregistered." << endl;
         if (db->validate_user(user.value())) {
@@ -108,7 +111,8 @@ void handle_list(const Request &req, Connections conns, Database *db) {
 }
 
 void handle_my_auctions(const Request &req, Connections conns, Database *db) {
-    auto u = parse_user(req.message);
+    istringstream iss(req.message);
+    auto u = parse_user(iss);
 
     if (u.has_value()) {
         cout << "User " << u.value().uid << " requested their auctions."
@@ -137,7 +141,8 @@ void handle_my_auctions(const Request &req, Connections conns, Database *db) {
 }
 
 void handle_my_bids(const Request &req, Connections conns, Database *db) {
-    auto u = parse_user(req.message);
+    istringstream iss(req.message);
+    auto u = parse_user(iss);
 
     if (u.has_value()) {
         cout << "User " << u.value().uid << " requested their bids." << endl;
@@ -252,37 +257,92 @@ string get_current_time() {
 }
 
 void handle_open(const Request &req, int tcp_fd, Database *db) {
-    auto user = parse_user(req.message);
+    istringstream iss(req.message);
+    auto user = parse_user(iss);
 
-    if (user.has_value()) {
-        cout << "User " << user.value().uid << " requested to open an auction."
-             << endl;
-        auto db_user = db->get_user(user.value().uid);
-        if (db->validate_user(db_user.value())) {
-            // parse the rest of the request
-            auto auction = parse_open_message(req.message);
-            if (auction.has_value()) {
-                auction.value().aid = db->generate_aid();
-                auction.value().open = true;
-                auction.value().start_date_time = get_current_time();
-                auction.value().end = {};
-                auction.value().bids = {};
-
-                db->add_auction(auction.value());
-                cout << "Auction " << auction.value().aid << " opened." << endl;
-                send_tcp("ROA OK " + auction.value().aid + "\n", tcp_fd);
-            } else {
-                cout << "Auction could not be started" << endl;
-                send_tcp("ROA NOK\n", tcp_fd);
-            }
-        } else {
-            cout << "User not logged in." << endl;
-            send_tcp("ROA NLG\n", tcp_fd);
-        }
-    } else {
+    if (!user) {
         cout << "Invalid user." << endl;
         send_tcp("ERR: invalid user\n", tcp_fd);
+        return;
     }
+
+    cout << "User " << user.value().uid << " requested to open an auction."
+         << endl;
+    auto db_user = db->get_user(user.value().uid);
+    if (!db->validate_user(db_user.value())) {
+        cout << "User not logged in." << endl;
+        send_tcp("ROA NLG\n", tcp_fd);
+        return;
+    }
+    auto auction = parse_open_message(req.message);
+
+    if (!auction) {
+        cout << "Auction could not be started." << endl;
+        send_tcp("ROA NOK\n", tcp_fd);
+        return;
+    }
+
+    auction.value().aid = db->generate_aid();
+    auction.value().open = true;
+    auction.value().start_date_time = get_current_time();
+    auction.value().end = {};
+    auction.value().bids = {};
+
+    db->add_auction(auction.value());
+    cout << "Auction " << auction.value().aid << " opened." << endl;
+    send_tcp("ROA OK " + auction.value().aid + "\n", tcp_fd);
+}
+
+void handle_close(const Request &req, int tcp_fd, Database *db) {
+    istringstream iss(req.message);
+    string aid;
+    auto user = parse_user(iss);
+
+    if (!user) {
+        cout << "Invalid user." << endl;
+        send_tcp("ERR: invalid user\n", tcp_fd);
+        return;
+    }
+
+    iss >> aid;
+
+    cout << "User " << user.value().uid << " requested to close an auction."
+         << endl;
+
+    auto db_user = db->get_user(user.value().uid);
+
+    if (!db->validate_user(db_user.value())) {
+        cout << "User not logged in." << endl;
+        send_tcp("RCL NLG\n", tcp_fd);
+        return;
+    }
+
+    auto auction = db->get_auction(aid);
+
+    if (!auction) {
+        cout << "Auction not found." << endl;
+        send_tcp("RCL NOK\n", tcp_fd);
+        return;
+    }
+
+    if (auction.value().uid != user.value().uid) {
+        cout << "User does not own auction." << endl;
+        send_tcp("RCL NOK\n", tcp_fd);
+        return;
+    }
+
+    if (!auction.value().open) {
+        cout << "Auction already closed." << endl;
+        send_tcp("RCL ACL\n", tcp_fd);
+        return;
+    }
+
+    auction.value().open = false;
+    auction.value().end =
+        End{get_current_time(), static_cast<int>(time(nullptr))};
+    db->update_auction(auction.value());
+    cout << "Auction " << auction.value().aid << " closed." << endl;
+    send_tcp("RCL OK\n", tcp_fd);
 }
 
 #endif

@@ -150,6 +150,11 @@ class Database {
         return data.auctions[aid];
     }
 
+    void update_auction(const Auction &auction) {
+        data.auctions[auction.aid] = auction;
+        store_database();
+    }
+
     vector<Auction> get_auctions() {
         vector<Auction> auctions;
         for (auto auction : data.auctions) {
