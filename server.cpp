@@ -115,6 +115,7 @@ int main(int argc, char *argv[]) {
 
         switch (out_fds) {
         case 0:
+            db->close_ended_auctions();
             // cout << "Timeout" << endl;
             break;
         case -1:

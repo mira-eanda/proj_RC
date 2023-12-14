@@ -33,47 +33,6 @@ optional<User> parse_user(istringstream &iss) {
     }
 }
 
-string get_current_time() {
-    time_t now = time(0);
-    tm *ltm = localtime(&now);
-    char buffer[80];
-    strftime(buffer, 80, "%Y-%m-%d %H:%M:%S", ltm);
-    return string(buffer);
-}
-
-bool check_auction_ended(const Auction &auction) {
-    cout << auction.open << endl;
-    if (auction.open) {
-        time_t now = time(0);
-
-        auto start_date_time = auction.start_date_time;
-
-        struct tm tm;
-        strptime(start_date_time.c_str(), "%Y-%m-%d %H:%M:%S", &tm);
-        time_t start_date_time_sec = mktime(&tm);
-
-        cout << "start_date_time_sec: " << start_date_time_sec << endl;
-        cout << "now: " << now << endl;
-        cout << "auction.timeactive: " << auction.timeactive << endl;
-
-        return (start_date_time_sec + auction.timeactive) > now;
-    } else {
-        return true;
-    }
-}
-
-int get_end_sec_time(const string &start, const string &end) {
-    struct tm tm_start, tm_end;
-
-    strptime(start.c_str(), "%Y-%m-%d %H:%M:%S", &tm_start);
-    strptime(end.c_str(), "%Y-%m-%d %H:%M:%S", &tm_end);
-
-    time_t start_time = mktime(&tm_start);
-    time_t end_time = mktime(&tm_end);
-
-    return difftime(end_time, start_time);
-}
-
 void handle_login(Request &req, Connections conns, Database *db) {
     istringstream iss(req.message);
     auto user = parse_user(iss);
@@ -252,30 +211,14 @@ optional<Auction> parse_auction(const string &input) {
     }
 }
 
-void close_auction(const string &aid, Database *db) {
-    auto auction = db->get_auction(aid).value();
-
-    End end;
-    end.end_date_time = get_current_time();
-    cout << "end_date_time: " << end.end_date_time << endl;
-    end.end_sec_time =
-        get_end_sec_time(auction.start_date_time, end.end_date_time);
-    cout << "end_sec_time: " << end.end_sec_time << endl;
-
-    db->set_auction_end(aid, end);
-}
-
 void handle_show_record(const Request &req, Connections conns, Database *db) {
     string aid = req.message;
     cout << aid << endl;
+    aid = aid.substr(0, aid.size() - 1);
 
     auto auction = db->get_auction(aid);
 
     if (auction.has_value()) {
-        if (check_auction_ended(auction.value())) {
-            cout << "Auction " << aid << " ended." << endl;
-            close_auction(aid, db);
-        }
         cout << "Auction found." << endl;
         send_auction_record(auction.value(), conns, db);
     } else {
@@ -375,9 +318,9 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    auction.value().open = false;
-    auction.value().end =
-        End{get_current_time(), static_cast<int>(time(nullptr))};
+    // auction.value().open = false;
+    // auction.value().end =
+    //     End{get_current_time(), static_cast<int>(time(nullptr))};
     db->update_auction(auction.value());
     cout << "Auction " << auction.value().aid << " closed." << endl;
     send_tcp("RCL OK\n", tcp_fd);

@@ -4,6 +4,7 @@
 #include <optional>
 #include <sstream>
 #include <unordered_map>
+#include <chrono>
 
 #include "common.hpp"
 #include "deps/json.hpp"
@@ -49,8 +50,8 @@ struct User {
     vector<Bid> bids;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in, host_auctions,
-                                   bids);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in,
+                                   host_auctions, bids);
 
 struct End {
     string end_date_time;
@@ -74,8 +75,8 @@ struct Auction {
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, aid, uid, auction_name, asset_fname,
-                                   start_value, start_date_time, timeactive, open,
-                                   bids, end);
+                                   start_value, start_date_time, timeactive,
+                                   open, bids, end);
 
 struct Data {
     unordered_map<string, User> users;
@@ -86,9 +87,75 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Data, users, auctions);
 
 constexpr auto SAVE_FILE = "database.json";
 
+
+string get_current_time() {
+    time_t now = time(0);
+    tm *ltm = gmtime(&now);
+    char buffer[80];
+    strftime(buffer, 80, "%Y-%m-%d %H:%M:%S", ltm);
+    return string(buffer);
+}
+
+bool check_auction_ended(const Auction &auction) {
+    // current time
+    auto now = chrono::system_clock::now();
+    auto now_time_t = chrono::system_clock::to_time_t(now);
+
+    // auction start time
+    struct tm tm_start;
+    istringstream iss(auction.start_date_time);
+    iss >> get_time(&tm_start, "%Y-%m-%d %H:%M:%S");
+    auto start_time_t = mktime(&tm_start);
+
+    // expected end time
+    auto end_time_t = start_time_t + auction.timeactive;
+
+    cout << "now_time_t: " << now_time_t << endl;
+    cout << "start_time_t: " << start_time_t << endl;
+    cout << "end_time_t: " << end_time_t << endl;
+
+    return now_time_t > end_time_t;
+}
+
+int get_end_sec_time(const string &start, const string &end) {
+    struct tm tm_start, tm_end;
+
+    strptime(start.c_str(), "%Y-%m-%d %H:%M:%S", &tm_start);
+    strptime(end.c_str(), "%Y-%m-%d %H:%M:%S", &tm_end);
+
+    time_t start_time = mktime(&tm_start);
+    time_t end_time = mktime(&tm_end);
+
+    return difftime(end_time, start_time);
+}
+
 class Database {
   public:
     Database() { load_database(); }
+
+    void close_ended_auctions() {
+        cout << "Checking for ended auctions..." << endl;
+        for (auto record : data.auctions) {
+            if (record.second.open) {
+                if (check_auction_ended(record.second)) {
+                    cout << "Auction " << record.first << " ended." << endl;
+                    close_auction(record.second);
+                }
+            }
+        }
+        store_database();
+    }
+
+    void close_auction(const Auction &auction) {
+        End end;
+        end.end_date_time = get_current_time();
+        end.end_sec_time =
+            get_end_sec_time(auction.start_date_time, end.end_date_time);
+
+        data.auctions[auction.aid].open = false;
+        data.auctions[auction.aid].end = end;
+    }
+
     bool add_user(const string &uid, const string &password) {
         if (data.users.find(uid) != data.users.end()) {
             return false;
@@ -177,7 +244,7 @@ class Database {
              [](const Bid &a, const Bid &b) { return a.value < b.value; });
         return bids;
     }
-    
+
     vector<Bid> get_bids_by_user(const string &uid) {
         auto user = get_user(uid);
         vector<Bid> bids;
@@ -195,7 +262,7 @@ class Database {
 
     string generate_aid() {
         int max_aid = 0;
-        for (const auto& auction_pair : data.auctions) {
+        for (const auto &auction_pair : data.auctions) {
             int aid = stoi(auction_pair.first);
             max_aid = max(max_aid, aid);
         }
@@ -204,15 +271,8 @@ class Database {
         stringstream ss;
         ss << setw(3) << setfill('0') << max_aid;
         return ss.str();
-    } 
-
-    void set_auction_end(const string &aid, const End &end) {
-        data.auctions[aid].open = false;
-        data.auctions[aid].end = end;
-
-        store_database();
     }
-        
+
   private:
     Data data;
     const string filename = SAVE_FILE;
