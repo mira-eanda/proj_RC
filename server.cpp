@@ -40,11 +40,22 @@ Arguments parse_arguments(int argc, char *argv[]) {
     return args;
 }
 
+Connections conns{};
+int tcp_fd;
+
+void signal_handler(int signum) {
+    cout << "Exiting..." << endl;
+    freeaddrinfo(conns.udp.addr);
+    freeaddrinfo(conns.tcp.addr);
+    close(conns.udp.fd);
+    close(tcp_fd);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
     auto args = parse_arguments(argc, argv);
 
     fd_set inputs, testfds;
-    Connections conns{};
 
     addrinfo hints{};
 
@@ -62,7 +73,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    int tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (tcp_fd == -1) {
         cerr << "Error creating socket." << endl;
         cerr << "Error: " << strerror(errno) << endl;
@@ -94,6 +105,8 @@ int main(int argc, char *argv[]) {
 
     int max_fd = max(conns.udp.fd, tcp_fd);
 
+    signal(SIGINT, signal_handler);
+
     while (1) {
         testfds = inputs; // Reload mask
         timeout = TIMEOUT_INTERVAL;
@@ -106,17 +119,13 @@ int main(int argc, char *argv[]) {
             break;
         case -1:
             cerr << "Select error" << endl;
+            signal_handler(0);
             exit(1);
         default:
             if (FD_ISSET(0, &testfds)) {
                 getline(cin, line);
                 if (line == "exit") {
-                    cout << "Exiting..." << endl;
-
-                    freeaddrinfo(conns.udp.addr);
-                    freeaddrinfo(conns.tcp.addr);
-                    close(conns.udp.fd);
-                    close(tcp_fd);
+                    signal_handler(0);
                     return 0;
                 }
             }
