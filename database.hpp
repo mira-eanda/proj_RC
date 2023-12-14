@@ -80,10 +80,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, uid, auction_name, asset_fname,
 struct Data {
     unordered_map<string, User> users;
     unordered_map<string, Auction> auctions;
-    unordered_map<string, Bid> bids;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Data, users, auctions, bids);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Data, users, auctions);
 
 constexpr auto SAVE_FILE = "database.json";
 

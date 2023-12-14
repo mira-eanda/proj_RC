@@ -11,11 +11,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
-#include <sys/sendfile.h>
 
 #include "common.hpp"
 
@@ -551,18 +551,18 @@ void open_auction(vector<string> &args, Connections conns,
     auto message = "OPA " + user->uid + " " + user->password + " " + name +
                    " " + start_value + " " + timeactive + " " + file->name +
                    " " + to_string(file->size) + " ";
-    
+
     int fd = init_tcp_connection(conns);
 
-    send_tcp(message, conns, fd);
+    send_tcp(message, fd);
     sendfile(fd, file_fd, 0, file->size);
-    send_tcp("\n", conns, fd);
+    send_tcp("\n", fd);
 
     auto res = receive_tcp(fd);
     if (!res) {
         return;
     }
-    auto response = parse_response(res.value(), "ROA");    
+    auto response = parse_response(res.value(), "ROA");
 
     auto status = response->status;
     auto aid = response->message;

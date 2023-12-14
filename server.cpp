@@ -145,8 +145,6 @@ int main(int argc, char *argv[]) {
                         handle_my_bids(req, conns, db);
                     } else if (req.type == "SRC") {
                         handle_show_record(req, conns, db);
-                    } else if (req.type == "OPA") {
-                        handle_open(req, conns, db);
                     }
                 }
             }
@@ -177,7 +175,11 @@ int main(int argc, char *argv[]) {
                         cerr << "Error: " << strerror(errno) << endl;
                         return {};
                     }
-                    cout << "Received: " << buffer << endl;
+                    auto req = parse_request(string(buffer, n));
+                    cout << "Received through TCP: " << req.type << req.message << endl;
+                    if (req.type == "OPA") {
+                        handle_open(req, i, db);
+                    }
                     close(i);
                     FD_CLR(i, &inputs);
                 }

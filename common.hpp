@@ -77,7 +77,7 @@ int init_tcp_connection(Connections conns) {
     return fd;
 }
 
-bool send_tcp(const string &command, Connections conns, int fd) {
+bool send_tcp(const string &command, int fd) {
     auto n = write(fd, command.c_str(), command.size());
     if (n == -1) {
         cerr << "Error sending message to AS." << endl;

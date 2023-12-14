@@ -30,10 +30,9 @@ optional<User> parse_user(const string &input) {
     if (iss >> user.password) {
         return user;
     } else {
-        return {user}; 
+        return {user};
     }
 }
-
 
 void handle_login(Request &req, Connections conns, Database *db) {
     auto user = parse_user(req.message);
@@ -112,7 +111,8 @@ void handle_my_auctions(const Request &req, Connections conns, Database *db) {
     auto u = parse_user(req.message);
 
     if (u.has_value()) {
-        cout << "User " << u.value().uid << " requested their auctions." << endl;
+        cout << "User " << u.value().uid << " requested their auctions."
+             << endl;
         auto user = db->get_user(u.value().uid);
         if (db->validate_user(user.value())) {
             auto auctions = db->get_auctions_by_user(user.value().uid);
@@ -149,7 +149,8 @@ void handle_my_bids(const Request &req, Connections conns, Database *db) {
             } else {
                 string msg = "RMB OK";
                 for (auto bid : bids) {
-                    msg += " " + bid.aid + " " + to_string(db->check_auction_open(bid.aid));
+                    msg += " " + bid.aid + " " +
+                           to_string(db->check_auction_open(bid.aid));
                 }
                 msg += "\n";
                 send_udp(msg, conns);
@@ -162,25 +163,26 @@ void handle_my_bids(const Request &req, Connections conns, Database *db) {
         cout << "Invalid user." << endl;
         send_udp("ERR: invalid user\n", conns);
     }
-
 }
 
+void send_auction_record(const Auction &auction, Connections conns,
+                         Database *db) {
+    string msg = "RRC OK " + auction.uid + " " + auction.auction_name + " " +
+                 auction.asset_fname + " " + to_string(auction.start_value) +
+                 " " + auction.start_date_time + " " +
+                 to_string(auction.timeactive) + "\n";
 
-void send_auction_record(const Auction &auction, Connections conns, Database *db) {
-    string msg = "RRC OK " + auction.uid + " " + auction.auction_name + " " + 
-        auction.asset_fname + " " + to_string(auction.start_value) + " " +
-        auction.start_date_time + " " + to_string(auction.timeactive) + "\n";
-    
     auto bids = db->get_bids_of_auction(auction);
     if (bids.size() > 0) {
         for (auto bid : bids) {
-            msg += "B " + bid.uid + " " + to_string(bid.value) + " " + 
-                bid.bid_date_time + " " + to_string(bid.bid_sec_time) + "\n";
+            msg += "B " + bid.uid + " " + to_string(bid.value) + " " +
+                   bid.bid_date_time + " " + to_string(bid.bid_sec_time) + "\n";
         }
     }
 
     if (!(auction.open)) {
-        msg += "E " + auction.end->end_date_time + " " + to_string(auction.end->end_sec_time) + "\n";
+        msg += "E " + auction.end->end_date_time + " " +
+               to_string(auction.end->end_sec_time) + "\n";
     }
     // cout << "msg: " << msg << endl;
     send_udp(msg, conns);
@@ -236,24 +238,28 @@ optional<Auction> parse_open_message(const string &input) {
     file.write(file_data.data(), file_data.size());
     file.close();
 
-    return auction;    
+    return auction;
 }
 
 string get_current_time() {
     time_t now = time(0);
     tm *ltm = localtime(&now);
-    string time = to_string(1900 + ltm->tm_year) + "-" + to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday) + " " + to_string(ltm->tm_hour) + ":" + to_string(ltm->tm_min) + ":" + to_string(ltm->tm_sec);
+    string time = to_string(1900 + ltm->tm_year) + "-" +
+                  to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday) +
+                  " " + to_string(ltm->tm_hour) + ":" + to_string(ltm->tm_min) +
+                  ":" + to_string(ltm->tm_sec);
     return time;
 }
 
-void handle_open(const Request &req, Connections conns, Database *db) {
+void handle_open(const Request &req, int tcp_fd, Database *db) {
     auto user = parse_user(req.message);
-    
+
     if (user.has_value()) {
-        cout << "User " << user.value().uid << " requested to open an auction." << endl;
+        cout << "User " << user.value().uid << " requested to open an auction."
+             << endl;
         auto db_user = db->get_user(user.value().uid);
         if (db->validate_user(db_user.value())) {
-            //parse the rest of the request
+            // parse the rest of the request
             auto auction = parse_open_message(req.message);
             if (auction.has_value()) {
                 auction.value().aid = db->generate_aid();
@@ -262,22 +268,21 @@ void handle_open(const Request &req, Connections conns, Database *db) {
                 auction.value().end = {};
                 auction.value().bids = {};
 
-                db -> add_auction(auction.value());
+                db->add_auction(auction.value());
                 cout << "Auction " << auction.value().aid << " opened." << endl;
-                send_udp("ROA OK " + auction.value().aid + "\n", conns);
+                send_tcp("ROA OK " + auction.value().aid + "\n", tcp_fd);
             } else {
                 cout << "Auction could not be started" << endl;
-                send_udp("ROA NOK\n", conns);
-            } 
+                send_tcp("ROA NOK\n", tcp_fd);
+            }
         } else {
             cout << "User not logged in." << endl;
-            send_udp("ROA NLG\n", conns);
+            send_tcp("ROA NLG\n", tcp_fd);
         }
-    } else { 
+    } else {
         cout << "Invalid user." << endl;
-        send_udp("ERR: invalid user\n", conns);
+        send_tcp("ERR: invalid user\n", tcp_fd);
     }
-
 }
 
 #endif
