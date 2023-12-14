@@ -263,6 +263,12 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
+    if (db->get_auctions().size() >= 999) {
+        cout << "Too many auctions." << endl;
+        send_tcp("ROA NOK\n", tcp_fd);
+        return;
+    }
+
     auction->uid = user->uid;
     auction->aid = db->generate_aid();
     auction->open = true;
