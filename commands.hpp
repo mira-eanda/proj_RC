@@ -354,7 +354,8 @@ optional<AuctionInfo> parse_auction_info(const string &buffer) {
     while (iss >> bid) {
         if (bid == "E") {
             EndInfo end;
-            iss >> end.end_date_time >> end.end_sec_time;
+            iss >> date >> time >> end.end_sec_time;
+            end.end_date_time = date + " " + time;
             info.end = end;
             break;
         } else {

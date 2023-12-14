@@ -205,6 +205,13 @@ class Database {
         ss << setw(3) << setfill('0') << max_aid;
         return ss.str();
     } 
+
+    void set_auction_end(const string &aid, const End &end) {
+        data.auctions[aid].open = false;
+        data.auctions[aid].end = end;
+
+        store_database();
+    }
         
   private:
     Data data;
