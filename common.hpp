@@ -91,7 +91,7 @@ optional <string> receive_tcp(int fd) {
     string data;
     char buffer[128];
     while(true) {
-        n = read(fd, buffer, 128);
+        n = recv(fd, buffer, 128, 0);
         if (n == -1) {
             cerr << "Error receiving message from AS." << endl;
             cerr << "Error: " << strerror(errno) << endl;
@@ -101,6 +101,9 @@ optional <string> receive_tcp(int fd) {
             break;
         }
         data += string(buffer, n);
+        if (buffer[n - 1] == '\n') {
+            break;
+        }
     }
     return data;
 }

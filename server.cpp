@@ -114,6 +114,7 @@ int main(int argc, char *argv[]) {
                     cout << "Exiting..." << endl;
 
                     freeaddrinfo(conns.udp.addr);
+                    freeaddrinfo(conns.tcp.addr);
                     close(conns.udp.fd);
                     close(tcp_fd);
                     return 0;
@@ -169,16 +170,16 @@ int main(int argc, char *argv[]) {
             }
             for (int i = tcp_fd + 1; i < max_fd; ++i) {
                 if (FD_ISSET(i, &testfds)) {
-                    char buffer[128];
-                    int n = read(i, buffer, 128);
-                    if (n == -1) {
-                        cerr << "Error: " << strerror(errno) << endl;
-                        return {};
-                    }
-                    auto req = parse_request(string(buffer, n));
-                    cout << "Received through TCP: " << req.type << req.message << endl;
-                    if (req.type == "OPA") {
-                        handle_open(req, i, db);
+                    auto r = receive_tcp(i);
+                    if (!r) {
+                        cout << "Failed receiving." << endl;
+                    } else {
+                        auto req = parse_request(r.value());
+                        cout << "Received through TCP: " << req.type
+                             << req.message << endl;
+                        if (req.type == "OPA") {
+                            handle_open(req, i, db);
+                        }
                     }
                     close(i);
                     FD_CLR(i, &inputs);
