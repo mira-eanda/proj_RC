@@ -193,7 +193,9 @@ int main(int argc, char *argv[]) {
                             handle_close(req, i, db);
                         } else if (req.type == "BID") {
                             handle_bid(req, i, db);
-                        } 
+                        } else if (req.type == "SAS") {
+                            handle_show_asset(req, i, db);
+                        }
                     }
                     close(i);
                     FD_CLR(i, &inputs);

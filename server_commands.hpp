@@ -413,4 +413,40 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
     cout << "Bid accepted." << endl;
 }
 
+void handle_show_asset(const Request &req, int tcp_fd, Database *db) {
+    string aid = req.message;
+    aid = aid.substr(0, aid.size() - 1);
+
+    cout << "User requested to show asset of auction " << aid << endl;
+
+    auto auction = db->get_auction(aid);
+
+    if (!auction) {
+        cout << "Auction not found." << endl;
+        send_tcp("RSA NOK\n", tcp_fd);
+        return;
+    }
+    if (auction.value().asset_fname == "") {
+        cout << "Auction has no asset." << endl;
+        send_tcp("RSA NOK\n", tcp_fd);
+        return;
+    }
+
+    int file_fd = open(auction.value().asset_fname.c_str(), O_RDONLY);
+
+    auto message = "RSA OK " + auction.value().asset_fname + " " + 
+                   to_string(auction.value().asset_fsize) + " ";
+    send_tcp(message, tcp_fd);
+    cout <<"file size: " << auction.value().asset_fsize << endl;
+    auto n = sendfile(tcp_fd, file_fd, 0, auction.value().asset_fsize);
+    if (n == -1) {
+        cout << "Error sending asset." << endl;
+        return;
+    }
+    send_tcp("\n", tcp_fd);
+
+    close(file_fd);
+    cout << "Asset sent." << endl;
+}
+
 #endif

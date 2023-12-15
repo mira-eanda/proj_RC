@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <chrono>
+#include <sys/sendfile.h>
 
 #include "common.hpp"
 #include "deps/json.hpp"
@@ -74,7 +75,7 @@ struct Auction {
     optional<End> end;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, aid, uid, auction_name, asset_fname,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, aid, uid, auction_name, asset_fname, asset_fsize,
                                    start_value, start_date_time, timeactive,
                                    open, bids, end);
 
