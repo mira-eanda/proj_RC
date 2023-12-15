@@ -4,19 +4,13 @@
 struct Request {
     string type;
     string message;
-    string uid;
 };
 
 Request parse_request(const string &input) {
     Request req;
 
-    istringstream iss(input);
-    iss >> req.type;
-
-    string arg;
-    while (iss >> arg) {
-        req.message += arg + " ";
-    }
+    req.type = input.substr(0, 3);
+    req.message = input.substr(4, input.size() - 4);
 
     return req;
 }
@@ -273,6 +267,37 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
     auction->aid = db->generate_aid();
     auction->open = true;
     auction->start_date_time = get_current_time();
+
+    string path = "assets/" + auction->aid + "_" + auction->asset_fname;
+    ofstream file(path, ios::binary);
+    if (!file) {
+        cout << "Error opening file." << endl;
+        send_tcp("ROA NOK\n", tcp_fd);
+        return;
+    }
+
+    iss.ignore(1);
+
+    // write the rest of the message left in iss
+    int leftover = req.message.size() - iss.tellg();
+    char buffer[128];
+    req.message.copy(buffer, leftover, iss.tellg());
+    file.write(buffer, leftover);
+
+    // read the rest of the file
+    if (leftover < auction->asset_fsize) {
+        char buffer[1024];
+        int bytes_read;
+        int bytes_written = leftover;
+        while ((bytes_read = read(tcp_fd, buffer, 1024)) > 0) {
+            file.write(buffer, bytes_read);
+            bytes_written += bytes_read;
+            if (bytes_written >= auction->asset_fsize) {
+                break;
+            }
+        }
+    }
+    file.close();
 
     db->add_auction(auction.value());
     send_tcp("ROA OK " + auction->aid + "\n", tcp_fd);

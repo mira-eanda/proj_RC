@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
     int max_fd = max(conns.udp.fd, tcp_fd);
 
     signal(SIGINT, signal_handler);
+    signal(SIGABRT, signal_handler);
 
     while (1) {
         testfds = inputs; // Reload mask
