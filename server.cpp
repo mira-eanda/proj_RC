@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
                         handle_my_bids(req, conns, db);
                     } else if (req.type == "SRC") {
                         handle_show_record(req, conns, db);
-                    }
+                    } 
                 }
             }
             if (FD_ISSET(tcp_fd, &testfds)) {
@@ -191,7 +191,9 @@ int main(int argc, char *argv[]) {
                             handle_open(req, i, db);
                         } else if (req.type == "CLS") {
                             handle_close(req, i, db);
-                        }
+                        } else if (req.type == "BID") {
+                            handle_bid(req, i, db);
+                        } 
                     }
                     close(i);
                     FD_CLR(i, &inputs);

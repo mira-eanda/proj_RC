@@ -101,6 +101,7 @@ bool check_auction_ended(const Auction &auction) {
     auto now = chrono::system_clock::now();
     auto now_time_t = chrono::system_clock::to_time_t(now);
 
+    struct tm *tm_utc = std::gmtime(&now_time_t);
     // auction start time
     struct tm tm_start;
     istringstream iss(auction.start_date_time);
@@ -254,7 +255,7 @@ class Database {
         return bids;
     }
 
-    void add_bid_to_user(const Bid &bid, const string &uid) {
+    void add_bid(const Bid &bid, const string &uid) {
         data.users[uid].bids.push_back(bid);
         data.auctions[bid.aid].bids.push_back(bid);
         store_database();

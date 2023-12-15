@@ -324,12 +324,93 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    // auction.value().open = false;
-    // auction.value().end =
-    //     End{get_current_time(), static_cast<int>(time(nullptr))};
-    db->update_auction(auction.value());
+    auction.value().open = false;
+    db->close_auction(auction.value());
+    // db->update_auction(auction.value());
     cout << "Auction " << auction.value().aid << " closed." << endl;
     send_tcp("RCL OK\n", tcp_fd);
+}
+
+
+void handle_bid(const Request &req, int tcp_fd, Database *db) {
+    istringstream iss(req.message);
+    string aid;
+    int value;
+    auto user = parse_user(iss);
+
+    if (!user) {
+        cout << "Invalid user." << endl;
+        send_tcp("RBD NOK\n", tcp_fd);
+        return;
+    }
+
+    iss >> aid;
+    iss >> value;
+
+    cout << "User " << user.value().uid << " requested to bid on an auction " 
+         << aid << " with value " << value << endl;
+
+    auto db_user = db->get_user(user.value().uid);
+
+    if (!db->validate_user(db_user.value())) {
+        cout << "User not logged in." << endl;
+        send_tcp("RBD NLG\n", tcp_fd);
+        return;
+    }
+
+    auto auction = db->get_auction(aid);
+
+    if (!auction) {
+        cout << "Auction not found." << endl;
+        send_tcp("RBD NOK\n", tcp_fd);
+        return;
+    }
+
+    if (!auction.value().open) {
+        cout << "Auction already closed." << endl;
+        send_tcp("RBD NOK\n", tcp_fd);
+        return;
+    }
+
+    if (auction.value().uid == user.value().uid) {
+        cout << "User cannot bid on his own auction." << endl;
+        send_tcp("RBD ILG\n", tcp_fd);
+        return;
+    }
+
+    // check values of current bids
+    auto bids = db->get_bids_of_auction(auction.value());
+    if (bids.size() > 0) {
+        int max_bid = 0;
+        for (auto bid : bids) {
+            if (bid.value > max_bid) {
+                max_bid = bid.value;
+            }
+        }
+        if (value <= max_bid) {
+            cout << "Bid value too low." << endl;
+            send_tcp("RBD REF\n", tcp_fd);
+            return;
+        } 
+    } else if (bids.size() == 0) {
+        if (value <= auction.value().start_value) {
+            cout << "Bid value too low." << endl;
+            send_tcp("RBD REF\n", tcp_fd);
+            return;
+        }
+    }
+
+    Bid bid;
+    bid.aid = aid;
+    bid.uid = user.value().uid;
+    bid.value = value;
+    bid.bid_date_time = get_current_time();
+    bid.bid_sec_time = get_end_sec_time(auction.value().start_date_time, bid.bid_date_time);
+
+    db->add_bid(bid, db_user.value().uid);
+
+    send_tcp("RBD ACC\n", tcp_fd);
+    cout << "Bid accepted." << endl;
 }
 
 #endif

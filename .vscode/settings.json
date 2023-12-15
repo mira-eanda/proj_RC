@@ -9,6 +9,7 @@
         "optional": "cpp",
         "system_error": "cpp",
         "iostream": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "chrono": "cpp"
     }
 }
