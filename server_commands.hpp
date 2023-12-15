@@ -172,20 +172,21 @@ void send_auction_record(const Auction &auction, Connections conns,
     string msg = "RRC OK " + auction.uid + " " + auction.auction_name + " " +
                  auction.asset_fname + " " + to_string(auction.start_value) +
                  " " + auction.start_date_time + " " +
-                 to_string(auction.timeactive) + "\n";
+                 to_string(auction.timeactive);
 
     auto bids = db->get_bids_of_auction(auction);
     if (bids.size() > 0) {
         for (auto bid : bids) {
-            msg += "B " + bid.uid + " " + to_string(bid.value) + " " +
-                   bid.bid_date_time + " " + to_string(bid.bid_sec_time) + "\n";
+            msg += " B " + bid.uid + " " + to_string(bid.value) + " " +
+                   bid.bid_date_time + " " + to_string(bid.bid_sec_time);
         }
     }
 
     if (!(auction.open)) {
-        msg += "E " + auction.end->end_date_time + " " +
-               to_string(auction.end->end_sec_time) + "\n";
+        msg += " E " + auction.end->end_date_time + " " +
+               to_string(auction.end->end_sec_time);
     }
+    msg += "\n";
     send_udp(msg, conns);
 }
 
