@@ -154,13 +154,13 @@ void handle_my_bids(const Request &req, Connections conns, Database *db) {
         return;
     }
 
-    auto bids = db->get_bids_by_user(user.value().uid);
-    if (bids.size() == 0) {
+    auto auctions = db->get_bids_by_user(user.value().uid);
+    if (auctions.size() == 0) {
         send_udp("RMB NOK\n", conns);
     } else {
         string msg = "RMB OK";
-        for (auto bid : bids) {
-            msg += " " + bid + " " + to_string(db->check_auction_open(bid));
+        for (auto aid : auctions) {
+            msg += " " + aid + " " + to_string(db->check_auction_open(aid));
         }
         msg += "\n";
         send_udp(msg, conns);

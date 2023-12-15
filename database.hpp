@@ -48,12 +48,9 @@ struct User {
     string uid;
     string password;
     bool logged_in = false;
-    vector<string> host_auctions;
-    vector<Bid> bids;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in,
-                                   host_auctions, bids);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(User, uid, password, logged_in);
 
 struct End {
     string end_date_time;
@@ -240,17 +237,20 @@ class Database {
         return bids;
     }
 
-    set<string> get_bids_by_user(const string &uid) {
-        auto user = get_user(uid);
-        set<string> bids;
-        for (auto bid : user.value().bids) {
-            bids.insert(bid.aid);
+    vector<string> get_bids_by_user(const string &uid) {
+        vector<string> bids;
+        for (auto auction : data.auctions) {
+            for (auto bid : auction.second.bids) {
+                if (bid.uid == uid) {
+                    bids.push_back(bid.aid);
+                    break;
+                }
+            }
         }
         return bids;
     }
 
     void add_bid(const Bid &bid, const string &uid) {
-        data.users[uid].bids.push_back(bid);
         data.auctions[bid.aid].bids.push_back(bid);
         store_database();
     }
