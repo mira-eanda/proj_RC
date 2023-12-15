@@ -152,6 +152,7 @@ class Database {
 
         data.auctions[auction.aid].open = false;
         data.auctions[auction.aid].end = end;
+        store_database();
     }
 
     bool add_user(const string &uid, const string &password) {
@@ -213,11 +214,6 @@ class Database {
             return {};
         }
         return data.auctions[aid];
-    }
-
-    void update_auction(const Auction &auction) {
-        data.auctions[auction.aid] = auction;
-        store_database();
     }
 
     vector<Auction> get_auctions() {

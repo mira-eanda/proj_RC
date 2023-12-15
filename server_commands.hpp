@@ -349,9 +349,7 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    auction.value().open = false;
     db->close_auction(auction.value());
-    // db->update_auction(auction.value());
     cout << "Auction " << auction.value().aid << " closed." << endl;
     send_tcp("RCL OK\n", tcp_fd);
 }
