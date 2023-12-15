@@ -240,16 +240,16 @@ class Database {
     }
 
     vector<string> get_bids_by_user(const string &uid) {
-        vector<string> bids;
+        vector<string> auctions;
         for (auto auction : data.auctions) {
             for (auto bid : auction.second.bids) {
                 if (bid.uid == uid) {
-                    bids.push_back(bid.uid);
+                    auctions.push_back(auction.first);
                     break;
                 }
             }
         }
-        return bids;
+        return auctions;
     }
 
     void add_bid(const Bid &bid, const string &aid) {
