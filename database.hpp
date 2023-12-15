@@ -36,13 +36,12 @@ template <typename T> struct adl_serializer<optional<T>> {
 
 struct Bid {
     string uid;
-    string aid;
     int value;
     string bid_date_time;
     int bid_sec_time;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, aid, value);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, uid, value, bid_date_time, bid_sec_time);
 
 struct User {
     string uid;
@@ -242,7 +241,7 @@ class Database {
         for (auto auction : data.auctions) {
             for (auto bid : auction.second.bids) {
                 if (bid.uid == uid) {
-                    bids.push_back(bid.aid);
+                    bids.push_back(bid.uid);
                     break;
                 }
             }
@@ -250,8 +249,8 @@ class Database {
         return bids;
     }
 
-    void add_bid(const Bid &bid, const string &uid) {
-        data.auctions[bid.aid].bids.push_back(bid);
+    void add_bid(const Bid &bid, const string &aid) {
+        data.auctions[aid].bids.push_back(bid);
         store_database();
     }
 

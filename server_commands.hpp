@@ -425,14 +425,13 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
     }
 
     Bid bid;
-    bid.aid = aid;
     bid.uid = user.value().uid;
     bid.value = value;
     bid.bid_date_time = get_current_time();
     bid.bid_sec_time =
         get_end_sec_time(auction.value().start_date_time, bid.bid_date_time);
 
-    db->add_bid(bid, db_user.value().uid);
+    db->add_bid(bid, aid);
 
     send_tcp("RBD ACC\n", tcp_fd);
     cout << "Bid accepted." << endl;
