@@ -18,6 +18,7 @@
 using namespace std;
 
 constexpr auto DEFAULT_PORT = "58033";
+const auto history_path = "history.txt";
 
 // ./client -n "tejo.tecnico.ulisboa.pt" -p 58001
 
@@ -93,6 +94,8 @@ int main(int argc, char *argv[]) {
     cout << "\e[1;1H\e[2J";
     cout << "Welcome to the RC Auctions!" << endl;
 
+    linenoise::LoadHistory(history_path);
+
     linenoise::SetHistoryMaxLen(100);
     while (true) {
         string line;
@@ -127,7 +130,9 @@ int main(int argc, char *argv[]) {
             cout << "Unknown command." << endl;
         }
         linenoise::AddHistory(line.c_str());
+        linenoise::SaveHistory(history_path);
     }
+
 
     freeaddrinfo(connections.udp.addr);
     freeaddrinfo(connections.tcp.addr);
