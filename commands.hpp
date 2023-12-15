@@ -524,6 +524,10 @@ void open_auction(vector<string> &args, Connections conns,
         return;
     }
 
+    if (!validate_auth(user)) {
+        return;
+    }
+
     // open name asset_fname start_value timeactive
     auto name = args[0];
     auto asset_fname = args[1];
