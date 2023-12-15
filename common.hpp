@@ -86,25 +86,19 @@ bool send_tcp(const string &command, int fd) {
     return n != -1;
 }
 
-optional <string> receive_tcp(int fd) {
+optional<string> receive_tcp(int fd) {
     int n;
     string data;
     char buffer[128];
-    while(true) {
-        n = recv(fd, buffer, 128, 0);
-        if (n == -1) {
-            cerr << "Error receiving message from AS." << endl;
-            cerr << "Error: " << strerror(errno) << endl;
-            return {};
-        }
-        if (n == 0) {
-            break;
-        }
-        data += string(buffer, n);
-        if (buffer[n - 1] == '\n') {
-            break;
-        }
+    n = recv(fd, buffer, 128, 0);
+    if (n == -1) {
+        cerr << "Error receiving message from AS." << endl;
+        cerr << "Error: " << strerror(errno) << endl;
+        return {};
     }
-    return data;
+    if (n == 0) {
+        return {};
+    }
+    return string(buffer, n);
 }
 #endif

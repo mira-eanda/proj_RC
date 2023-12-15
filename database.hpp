@@ -111,10 +111,6 @@ bool check_auction_ended(const Auction &auction) {
     // expected end time
     auto end_time_t = start_time_t + auction.timeactive;
 
-    cout << "now_time_t: " << now_time_t << endl;
-    cout << "start_time_t: " << start_time_t << endl;
-    cout << "end_time_t: " << end_time_t << endl;
-
     return now_time_t > end_time_t;
 }
 
