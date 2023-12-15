@@ -455,7 +455,9 @@ void handle_show_asset(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    int file_fd = open(auction.value().asset_fname.c_str(), O_RDONLY);
+    string file_name = "assets/" + auction.value().aid + "_" + auction.value().asset_fname;
+
+    int file_fd = open(file_name.c_str(), O_RDONLY);
 
     auto message = "RSA OK " + auction.value().asset_fname + " " + 
                    to_string(auction.value().asset_fsize) + " ";
