@@ -1,12 +1,12 @@
 #ifndef DATABASE_HPP
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <optional>
-#include <sstream>
-#include <unordered_map>
-#include <chrono>
 #include <set>
+#include <sstream>
 #include <sys/sendfile.h>
+#include <unordered_map>
 
 #include "common.hpp"
 #include "deps/json.hpp"
@@ -41,7 +41,8 @@ struct Bid {
     int bid_sec_time;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, uid, value, bid_date_time, bid_sec_time);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Bid, uid, value, bid_date_time,
+                                   bid_sec_time);
 
 struct User {
     string uid;
@@ -72,9 +73,9 @@ struct Auction {
     optional<End> end;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, aid, uid, auction_name, asset_fname, asset_fsize,
-                                   start_value, start_date_time, timeactive,
-                                   open, bids, end);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Auction, aid, uid, auction_name, asset_fname,
+                                   asset_fsize, start_value, start_date_time,
+                                   timeactive, open, bids, end);
 
 struct Data {
     unordered_map<string, User> users;
@@ -84,7 +85,6 @@ struct Data {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Data, users, auctions);
 
 constexpr auto SAVE_FILE = "database.json";
-
 
 string get_current_time() {
     time_t now = time(0);
@@ -223,6 +223,9 @@ class Database {
 
     bool check_auction_open(const string &aid) {
         auto auction = get_auction(aid);
+        if (!auction) {
+            return false;
+        }
         return auction.value().open;
     }
 
