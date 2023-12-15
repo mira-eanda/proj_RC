@@ -139,29 +139,31 @@ void handle_my_bids(const Request &req, Connections conns, Database *db) {
     istringstream iss(req.message);
     auto u = parse_user(iss);
 
-    if (u.has_value()) {
-        cout << "User " << u.value().uid << " requested their bids." << endl;
-        auto user = db->get_user(u.value().uid);
-        if (db->validate_user(user.value())) {
-            auto bids = db->get_bids_by_user(user.value().uid);
-            if (bids.size() == 0) {
-                send_udp("RMB NOK\n", conns);
-            } else {
-                string msg = "RMB OK";
-                for (auto bid : bids) {
-                    msg += " " + bid.aid + " " +
-                           to_string(db->check_auction_open(bid.aid));
-                }
-                msg += "\n";
-                send_udp(msg, conns);
-            }
-        } else {
-            cout << "Unknown user." << endl;
-            send_udp("RMB NLG\n", conns);
-        }
-    } else {
+    if (!u) {
         cout << "Invalid user." << endl;
         send_udp("ERR: invalid user\n", conns);
+        return;
+    }
+
+    cout << "User " << u.value().uid << " requested their bids." << endl;
+    auto user = db->get_user(u.value().uid);
+
+    if (!db->validate_user(user.value())) {
+        cout << "Unknown user." << endl;
+        send_udp("RMB NLG\n", conns);
+        return;
+    }
+
+    auto bids = db->get_bids_by_user(user.value().uid);
+    if (bids.size() == 0) {
+        send_udp("RMB NOK\n", conns);
+    } else {
+        string msg = "RMB OK";
+        for (auto bid : bids) {
+            msg += " " + bid + " " + to_string(db->check_auction_open(bid));
+        }
+        msg += "\n";
+        send_udp(msg, conns);
     }
 }
 
@@ -354,7 +356,6 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
     send_tcp("RCL OK\n", tcp_fd);
 }
 
-
 void handle_bid(const Request &req, int tcp_fd, Database *db) {
     istringstream iss(req.message);
     string aid;
@@ -370,7 +371,7 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
     iss >> aid;
     iss >> value;
 
-    cout << "User " << user.value().uid << " requested to bid on an auction " 
+    cout << "User " << user.value().uid << " requested to bid on an auction "
          << aid << " with value " << value << endl;
 
     auto db_user = db->get_user(user.value().uid);
@@ -414,7 +415,7 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
             cout << "Bid value too low." << endl;
             send_tcp("RBD REF\n", tcp_fd);
             return;
-        } 
+        }
     } else if (bids.size() == 0) {
         if (value <= auction.value().start_value) {
             cout << "Bid value too low." << endl;
@@ -428,7 +429,8 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
     bid.uid = user.value().uid;
     bid.value = value;
     bid.bid_date_time = get_current_time();
-    bid.bid_sec_time = get_end_sec_time(auction.value().start_date_time, bid.bid_date_time);
+    bid.bid_sec_time =
+        get_end_sec_time(auction.value().start_date_time, bid.bid_date_time);
 
     db->add_bid(bid, db_user.value().uid);
 
@@ -457,10 +459,10 @@ void handle_show_asset(const Request &req, int tcp_fd, Database *db) {
 
     int file_fd = open(auction.value().asset_fname.c_str(), O_RDONLY);
 
-    auto message = "RSA OK " + auction.value().asset_fname + " " + 
+    auto message = "RSA OK " + auction.value().asset_fname + " " +
                    to_string(auction.value().asset_fsize) + " ";
     send_tcp(message, tcp_fd);
-    cout <<"file size: " << auction.value().asset_fsize << endl;
+    cout << "file size: " << auction.value().asset_fsize << endl;
     auto n = sendfile(tcp_fd, file_fd, 0, auction.value().asset_fsize);
     if (n == -1) {
         cout << "Error sending asset." << endl;

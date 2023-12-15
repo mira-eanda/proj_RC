@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <chrono>
+#include <set>
 #include <sys/sendfile.h>
 
 #include "common.hpp"
@@ -239,11 +240,11 @@ class Database {
         return bids;
     }
 
-    vector<Bid> get_bids_by_user(const string &uid) {
+    set<string> get_bids_by_user(const string &uid) {
         auto user = get_user(uid);
-        vector<Bid> bids;
+        set<string> bids;
         for (auto bid : user.value().bids) {
-            bids.push_back(bid);
+            bids.insert(bid.aid);
         }
         return bids;
     }
