@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 
     if ((bind(conns.udp.fd, conns.udp.addr->ai_addr,
               conns.udp.addr->ai_addrlen)) == -1) {
-        cerr << "Bind error UDP server" << endl;
+        cerr << "Bind error UDP: " << strerror(errno) << endl;
         exit(1);
     }
 
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 
     if (bind(tcp_fd, conns.udp.addr->ai_addr, conns.udp.addr->ai_addrlen) ==
         -1) {
-        cerr << "Bind error TCP server" << endl;
+        cerr << "Bind error TCP: " << strerror(errno) << endl;
         exit(1);
     }
 
