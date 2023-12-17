@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <filesystem>
 
 #include "server_commands.hpp"
 
@@ -58,6 +59,10 @@ int main(int argc, char *argv[]) {
     fd_set inputs, testfds;
 
     addrinfo hints{};
+
+    if (!filesystem::exists("assets")) {
+        filesystem::create_directory("assets");
+    }
 
     // Configure udp server address
     memset(&hints, 0, sizeof(hints));
