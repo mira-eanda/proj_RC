@@ -115,15 +115,8 @@ int main(int argc, char *argv[]) {
         int out_fds = select(FD_SETSIZE, &testfds, NULL, NULL, &timeout);
 
         switch (out_fds) {
-        case 0: {
-            auto closed = db->close_ended_auctions();
-            if (args.verbose && closed > 0) {
-                cout << "----------------------------------------" << endl;
-                cout << "Closed " << closed << " auctions" << endl;
-                cout << "----------------------------------------" << endl;
-            }
+        case 0:
             break;
-        }
         case -1:
             cerr << "Select error" << endl;
             cleanup(0);
@@ -151,6 +144,7 @@ int main(int argc, char *argv[]) {
                              << endl;
                         cout << "\t" << req.type << " " << req.message << endl;
                     }
+                    db->close_ended_auctions();
                     if (req.type == "LIN") {
                         handle_login(req, conns, db, args.verbose);
                     } else if (req.type == "LOU") {
@@ -201,6 +195,7 @@ int main(int argc, char *argv[]) {
                     if (!r) {
                         cout << "Failed receiving." << endl;
                     } else {
+                        db->close_ended_auctions();
                         auto req = parse_request(r.value());
                         if (args.verbose) {
                             cout << "----------------------------------------"

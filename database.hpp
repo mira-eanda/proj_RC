@@ -94,23 +94,6 @@ string get_current_time() {
     return string(buffer);
 }
 
-bool check_auction_ended(const Auction &auction) {
-    // current time
-    auto now = chrono::system_clock::now();
-    auto now_time_t = chrono::system_clock::to_time_t(now);
-
-    // auction start time
-    struct tm tm_start;
-    istringstream iss(auction.start_date_time);
-    iss >> get_time(&tm_start, "%Y-%m-%d %H:%M:%S");
-    auto start_time_t = timegm(&tm_start);
-
-    // expected end time
-    auto end_time_t = start_time_t + auction.timeactive;
-
-    return now_time_t >= end_time_t;
-}
-
 int get_end_sec_time(const string &start, const string &end) {
     struct tm tm_start, tm_end;
 
@@ -133,12 +116,39 @@ class Database {
             if (record.second.open) {
                 if (check_auction_ended(record.second)) {
                     closed++;
-                    close_auction(record.second);
+                    // close_auction(record.second);
                 }
             }
         }
         store_database();
         return closed;
+    }
+
+    bool check_auction_ended(const Auction &auction) {
+        // current time
+        auto now = chrono::system_clock::now();
+        auto now_time_t = chrono::system_clock::to_time_t(now);
+
+        // auction start time
+        struct tm tm_start;
+        istringstream iss(auction.start_date_time);
+        iss >> get_time(&tm_start, "%Y-%m-%d %H:%M:%S");
+        auto start_time_t = timegm(&tm_start);
+
+        // expected end time
+        auto end_time_t = start_time_t + auction.timeactive;
+
+        if (now_time_t >= end_time_t) {
+            End end;
+            stringstream ss;
+            ss << put_time(gmtime(&end_time_t), "%Y-%m-%d %H:%M:%S");
+            end.end_date_time = ss.str();
+            end.end_sec_time = auction.timeactive;
+            data.auctions[auction.aid].open = false;
+            data.auctions[auction.aid].end = end;
+        }
+
+        return now_time_t >= end_time_t;
     }
 
     void close_auction(const Auction &auction) {
