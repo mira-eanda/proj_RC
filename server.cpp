@@ -21,7 +21,7 @@
 using namespace std;
 
 constexpr auto DEFAULT_PORT = "58033";
-constexpr timeval TIMEOUT_INTERVAL = {10, 0}; // 10 seconds
+constexpr timeval TIMEOUT_INTERVAL = {1, 0}; // 1 seconds
 
 struct Arguments {
     const char *ASport = DEFAULT_PORT;
@@ -43,7 +43,7 @@ Arguments parse_arguments(int argc, char *argv[]) {
 Connections conns{};
 int tcp_fd;
 
-void signal_handler(int signum) {
+void cleanup(int signum) {
     cout << "Exiting..." << endl;
     freeaddrinfo(conns.udp.addr);
     freeaddrinfo(conns.tcp.addr);
@@ -79,7 +79,6 @@ int main(int argc, char *argv[]) {
         cerr << "Error: " << strerror(errno) << endl;
         exit(1);
     }
-    cout << "Socket created." << endl;
 
     if (bind(tcp_fd, conns.udp.addr->ai_addr, conns.udp.addr->ai_addrlen) ==
         -1) {
@@ -105,9 +104,10 @@ int main(int argc, char *argv[]) {
 
     int max_fd = max(conns.udp.fd, tcp_fd);
 
-    signal(SIGINT, signal_handler);
-    signal(SIGABRT, signal_handler);
+    signal(SIGINT, cleanup);
+    signal(SIGABRT, cleanup);
 
+    cout << "Server listening on port " << args.ASport << endl;
     while (1) {
         testfds = inputs; // Reload mask
         timeout = TIMEOUT_INTERVAL;
@@ -115,53 +115,64 @@ int main(int argc, char *argv[]) {
         int out_fds = select(FD_SETSIZE, &testfds, NULL, NULL, &timeout);
 
         switch (out_fds) {
-        case 0:
-            db->close_ended_auctions();
-            // cout << "Timeout" << endl;
+        case 0: {
+            auto closed = db->close_ended_auctions();
+            if (args.verbose && closed > 0) {
+                cout << "----------------------------------------" << endl;
+                cout << "Closed " << closed << " auctions" << endl;
+                cout << "----------------------------------------" << endl;
+            }
             break;
+        }
         case -1:
             cerr << "Select error" << endl;
-            signal_handler(0);
+            cleanup(0);
             exit(1);
         default:
             if (FD_ISSET(0, &testfds)) {
                 getline(cin, line);
                 if (line == "exit") {
-                    signal_handler(0);
+                    cleanup(0);
                     return 0;
                 }
             }
             if (FD_ISSET(conns.udp.fd, &testfds)) {
                 auto res = receive_udp(conns);
                 if (res.has_value()) {
+                    auto req = parse_request(res.value());
                     if (args.verbose && getnameinfo(conns.udp.addr->ai_addr,
                                                     conns.udp.addr->ai_addrlen,
                                                     host, sizeof host, service,
                                                     sizeof service, 0) == 0) {
-                        cout << "Received through UDP: " << res.value() << endl;
-                        cout << "Sent by [" << host << ":" << service << "]"
+                        cout << "----------------------------------------"
+                             << endl;
+                        cout << "NEW UDP REQUEST:" << endl;
+                        cout << "\tSent by [" << host << ":" << service << "]"
+                             << endl;
+                        cout << "\t" << req.type << " " << req.message << endl;
+                    }
+                    if (req.type == "LIN") {
+                        handle_login(req, conns, db, args.verbose);
+                    } else if (req.type == "LOU") {
+                        handle_logout(req, conns, db, args.verbose);
+                    } else if (req.type == "UNR") {
+                        handle_unregister(req, conns, db, args.verbose);
+                    } else if (req.type == "LST") {
+                        handle_list(req, conns, db, args.verbose);
+                    } else if (req.type == "LMA") {
+                        handle_my_auctions(req, conns, db, args.verbose);
+                    } else if (req.type == "LMB") {
+                        handle_my_bids(req, conns, db, args.verbose);
+                    } else if (req.type == "SRC") {
+                        handle_show_record(req, conns, db, args.verbose);
+                    }
+                    if (args.verbose) {
+                        cout << "----------------------------------------"
                              << endl;
                     }
-                    auto req = parse_request(res.value());
-                    if (req.type == "LIN") {
-                        handle_login(req, conns, db);
-                    } else if (req.type == "LOU") {
-                        handle_logout(req, conns, db);
-                    } else if (req.type == "UNR") {
-                        handle_unregister(req, conns, db);
-                    } else if (req.type == "LST") {
-                        handle_list(req, conns, db);
-                    } else if (req.type == "LMA") {
-                        handle_my_auctions(req, conns, db);
-                    } else if (req.type == "LMB") {
-                        handle_my_bids(req, conns, db);
-                    } else if (req.type == "SRC") {
-                        handle_show_record(req, conns, db);
-                    } 
                 }
             }
             if (FD_ISSET(tcp_fd, &testfds)) {
-                cout << "Accepting connection " << tcp_fd << endl;
                 sockaddr addr;
                 socklen_t addrlen;
                 int clientSocket = accept(tcp_fd, &addr, &addrlen);
@@ -172,8 +183,13 @@ int main(int argc, char *argv[]) {
                     if (args.verbose &&
                         getnameinfo(&addr, addrlen, host, sizeof host, service,
                                     sizeof service, 0) == 0) {
+                        cout << "----------------------------------------"
+                             << endl;
+
                         cout << "Accepted connection from [" << host << ":"
                              << service << "]" << endl;
+                        cout << "----------------------------------------"
+                             << endl;
                     }
                     FD_SET(clientSocket, &inputs);
                     max_fd = max(max_fd, clientSocket + 1);
@@ -186,16 +202,25 @@ int main(int argc, char *argv[]) {
                         cout << "Failed receiving." << endl;
                     } else {
                         auto req = parse_request(r.value());
-                        cout << "Received through TCP: " << req.type
-                             << req.message << endl;
+                        if (args.verbose) {
+                            cout << "----------------------------------------"
+                                 << endl;
+                            cout << "NEW TCP REQUEST:" << endl;
+                            cout << "\t" << req.type << " " << req.message
+                                 << endl;
+                        }
                         if (req.type == "OPA") {
-                            handle_open(req, i, db);
+                            handle_open(req, i, db, args.verbose);
                         } else if (req.type == "CLS") {
-                            handle_close(req, i, db);
+                            handle_close(req, i, db, args.verbose);
                         } else if (req.type == "BID") {
-                            handle_bid(req, i, db);
+                            handle_bid(req, i, db, args.verbose);
                         } else if (req.type == "SAS") {
-                            handle_show_asset(req, i, db);
+                            handle_show_asset(req, i, db, args.verbose);
+                        }
+                        if (args.verbose) {
+                            cout << "----------------------------------------"
+                                 << endl;
                         }
                     }
                     close(i);

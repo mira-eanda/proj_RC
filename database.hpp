@@ -128,17 +128,18 @@ class Database {
   public:
     Database() { load_database(); }
 
-    void close_ended_auctions() {
-        cout << "Checking for ended auctions..." << endl;
+    int close_ended_auctions() {
+        int closed = 0;
         for (auto record : data.auctions) {
             if (record.second.open) {
                 if (check_auction_ended(record.second)) {
-                    cout << "Auction " << record.first << " ended." << endl;
+                    closed++;
                     close_auction(record.second);
                 }
             }
         }
         store_database();
+        return closed;
     }
 
     void close_auction(const Auction &auction) {

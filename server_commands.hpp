@@ -27,39 +27,51 @@ optional<User> parse_user(istringstream &iss) {
     }
 }
 
-void handle_login(Request &req, Connections conns, Database *db) {
+void handle_login(Request &req, Connections conns, Database *db, bool v) {
     istringstream iss(req.message);
     auto user = parse_user(iss);
     if (user.has_value()) {
-        cout << "User " << user.value().uid << " logged in." << endl;
 
         auto db_user = db->get_user(user.value().uid);
         if (db_user.has_value()) {
             if (db_user.value().password == user.value().password) {
                 db->set_logged_in(user.value().uid, true);
+                if (v) {
+                    cout << "User " << user.value().uid << " logged in."
+                         << endl;
+                }
                 send_udp("RLI OK\n", conns);
             } else {
-                cout << "Invalid password." << endl;
+                if (v) {
+                    cout << "Invalid password." << endl;
+                }
                 send_udp("RLI NOK\n", conns);
             }
         } else {
             db->add_user(user.value().uid, user.value().password);
-            cout << "User " << user.value().uid << " registered." << endl;
+            if (v) {
+                cout << "User " << user.value().uid << " registered." << endl;
+            }
             send_udp("RLI REG\n", conns);
         }
     } else {
-        cout << "Invalid user." << endl;
+        if (v) {
+            cout << "Invalid user." << endl;
+        }
         send_udp("RLI NOK\n", conns);
     }
 }
 
-void handle_logout(const Request &req, Connections conns, Database *db) {
+void handle_logout(const Request &req, Connections conns, Database *db,
+                   bool v) {
     istringstream iss(req.message);
     auto user = parse_user(iss);
 
     if (user.has_value()) {
-        cout << "User " << user.value().uid << " logged out." << endl;
         if (db->validate_user(user.value())) {
+            if (v) {
+                cout << "User " << user.value().uid << " logged out." << endl;
+            }
             db->set_logged_in(user.value().uid, false);
             send_udp("RLO OK\n", conns);
         } else {
@@ -72,13 +84,16 @@ void handle_logout(const Request &req, Connections conns, Database *db) {
     }
 }
 
-void handle_unregister(const Request &req, Connections conns, Database *db) {
+void handle_unregister(const Request &req, Connections conns, Database *db,
+                       bool v) {
     istringstream iss(req.message);
     auto user = parse_user(iss);
     if (user.has_value()) {
-        cout << "User " << user.value().uid << " unregistered." << endl;
         if (db->validate_user(user.value())) {
             db->delete_user(user.value().uid);
+            if (v) {
+                cout << "User " << user.value().uid << " unregistered." << endl;
+            }
             send_udp("RUR OK\n", conns);
         } else {
             cout << "Unknown user." << endl;
@@ -90,9 +105,10 @@ void handle_unregister(const Request &req, Connections conns, Database *db) {
     }
 }
 
-void handle_list(const Request &req, Connections conns, Database *db) {
+void handle_list(const Request &req, Connections conns, Database *db, bool v) {
     auto auctions = db->get_auctions();
     if (auctions.size() == 0) {
+        cout << "No auctions." << endl;
         send_udp("RLS NOK\n", conns);
     } else {
         string msg = "RLS OK";
@@ -100,22 +116,25 @@ void handle_list(const Request &req, Connections conns, Database *db) {
             msg += " " + auction.aid + " " + to_string(auction.open);
         }
         msg += "\n";
-        cout << "message sent: " << msg << endl;
+        if (v) {
+            cout << "Sending list of " << auctions.size() << " auctions."
+                 << endl;
+        }
         send_udp(msg, conns);
     }
 }
 
-void handle_my_auctions(const Request &req, Connections conns, Database *db) {
+void handle_my_auctions(const Request &req, Connections conns, Database *db,
+                        bool v) {
     istringstream iss(req.message);
     auto u = parse_user(iss);
 
     if (u.has_value()) {
-        cout << "User " << u.value().uid << " requested their auctions."
-             << endl;
         auto user = db->get_user(u.value().uid);
         if (db->validate_user(user.value())) {
             auto auctions = db->get_auctions_by_user(user.value().uid);
             if (auctions.size() == 0) {
+                cout << "No auctions." << endl;
                 send_udp("RMA NOK\n", conns);
             } else {
                 string msg = "RMA OK";
@@ -123,6 +142,10 @@ void handle_my_auctions(const Request &req, Connections conns, Database *db) {
                     msg += " " + auction.aid + " " + to_string(auction.open);
                 }
                 msg += "\n";
+                if (v) {
+                    cout << "Sending list of " << auctions.size()
+                         << " auctions." << endl;
+                }
                 send_udp(msg, conns);
             }
         } else {
@@ -135,7 +158,8 @@ void handle_my_auctions(const Request &req, Connections conns, Database *db) {
     }
 }
 
-void handle_my_bids(const Request &req, Connections conns, Database *db) {
+void handle_my_bids(const Request &req, Connections conns, Database *db,
+                    bool v) {
     istringstream iss(req.message);
     auto u = parse_user(iss);
 
@@ -145,7 +169,6 @@ void handle_my_bids(const Request &req, Connections conns, Database *db) {
         return;
     }
 
-    cout << "User " << u.value().uid << " requested their bids." << endl;
     auto user = db->get_user(u.value().uid);
 
     if (!db->validate_user(user.value())) {
@@ -163,6 +186,10 @@ void handle_my_bids(const Request &req, Connections conns, Database *db) {
             msg += " " + aid + " " + to_string(db->check_auction_open(aid));
         }
         msg += "\n";
+        if (v) {
+            cout << "Sending list of " << auctions.size() << " auctions."
+                 << endl;
+        }
         send_udp(msg, conns);
     }
 }
@@ -208,7 +235,8 @@ optional<Auction> parse_auction(const string &input) {
     }
 }
 
-void handle_show_record(const Request &req, Connections conns, Database *db) {
+void handle_show_record(const Request &req, Connections conns, Database *db,
+                        bool v) {
     string aid = req.message;
     cout << aid << endl;
     aid = aid.substr(0, aid.size() - 1);
@@ -216,7 +244,9 @@ void handle_show_record(const Request &req, Connections conns, Database *db) {
     auto auction = db->get_auction(aid);
 
     if (auction.has_value()) {
-        cout << "Auction found." << endl;
+        if (v) {
+            cout << "Sending record of auction " << aid << endl;
+        }
         send_auction_record(auction.value(), conns, db);
     } else {
         send_udp("RRC NOK\n", conns);
@@ -236,7 +266,7 @@ optional<Auction> parse_open_message(istringstream &iss) {
     return auction;
 }
 
-void handle_open(const Request &req, int tcp_fd, Database *db) {
+void handle_open(const Request &req, int tcp_fd, Database *db, bool v) {
     istringstream iss(req.message);
     auto user = parse_user(iss);
 
@@ -246,7 +276,6 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    cout << "User " << user->uid << " requested to open an auction." << endl;
     auto db_user = db->get_user(user->uid);
     if (!db->validate_user(db_user.value())) {
         send_tcp("ROA NLG\n", tcp_fd);
@@ -264,6 +293,10 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
         cout << "Too many auctions." << endl;
         send_tcp("ROA NOK\n", tcp_fd);
         return;
+    }
+
+    if (v) {
+        cout << "User " << user->uid << " opened an auction." << endl;
     }
 
     auction->uid = user->uid;
@@ -306,7 +339,7 @@ void handle_open(const Request &req, int tcp_fd, Database *db) {
     send_tcp("ROA OK " + auction->aid + "\n", tcp_fd);
 }
 
-void handle_close(const Request &req, int tcp_fd, Database *db) {
+void handle_close(const Request &req, int tcp_fd, Database *db, bool v) {
     istringstream iss(req.message);
     string aid;
     auto user = parse_user(iss);
@@ -318,11 +351,6 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
     }
 
     iss >> aid;
-
-    cout << "Auction id: " << aid << endl;
-
-    cout << "User " << user.value().uid << " requested to close an auction."
-         << endl;
 
     auto db_user = db->get_user(user.value().uid);
 
@@ -353,11 +381,13 @@ void handle_close(const Request &req, int tcp_fd, Database *db) {
     }
 
     db->close_auction(auction.value());
-    cout << "Auction " << auction.value().aid << " closed." << endl;
+    if (v) {
+        cout << "Auction " << auction.value().aid << " closed." << endl;
+    }
     send_tcp("RCL OK\n", tcp_fd);
 }
 
-void handle_bid(const Request &req, int tcp_fd, Database *db) {
+void handle_bid(const Request &req, int tcp_fd, Database *db, bool v) {
     istringstream iss(req.message);
     string aid;
     int value;
@@ -371,9 +401,6 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
 
     iss >> aid;
     iss >> value;
-
-    cout << "User " << user.value().uid << " requested to bid on an auction "
-         << aid << " with value " << value << endl;
 
     auto db_user = db->get_user(user.value().uid);
 
@@ -434,15 +461,21 @@ void handle_bid(const Request &req, int tcp_fd, Database *db) {
 
     db->add_bid(bid, aid);
 
+    if (v) {
+        cout << "User " << user.value().uid << " bidded on auction " << aid
+             << " with value " << value << endl;
+    }
+
     send_tcp("RBD ACC\n", tcp_fd);
-    cout << "Bid accepted." << endl;
 }
 
-void handle_show_asset(const Request &req, int tcp_fd, Database *db) {
+void handle_show_asset(const Request &req, int tcp_fd, Database *db, bool v) {
     string aid = req.message;
     aid = aid.substr(0, aid.size() - 1);
 
-    cout << "User requested to show asset of auction " << aid << endl;
+    if (v) {
+        cout << "User requested to show asset of auction " << aid << endl;
+    }
 
     auto auction = db->get_auction(aid);
 
@@ -457,14 +490,15 @@ void handle_show_asset(const Request &req, int tcp_fd, Database *db) {
         return;
     }
 
-    string file_name = "assets/" + auction.value().aid + "_" + auction.value().asset_fname;
+    string file_name =
+        "assets/" + auction.value().aid + "_" + auction.value().asset_fname;
 
     int file_fd = open(file_name.c_str(), O_RDONLY);
 
     auto message = "RSA OK " + auction.value().asset_fname + " " +
                    to_string(auction.value().asset_fsize) + " ";
     send_tcp(message, tcp_fd);
-    cout << "file size: " << auction.value().asset_fsize << endl;
+
     auto n = sendfile(tcp_fd, file_fd, 0, auction.value().asset_fsize);
     if (n == -1) {
         cout << "Error sending asset." << endl;
@@ -473,7 +507,6 @@ void handle_show_asset(const Request &req, int tcp_fd, Database *db) {
     send_tcp("\n", tcp_fd);
 
     close(file_fd);
-    cout << "Asset sent." << endl;
 }
 
 #endif
