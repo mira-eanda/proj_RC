@@ -21,7 +21,7 @@
 using namespace std;
 
 constexpr auto DEFAULT_PORT = "58033";
-constexpr timeval TIMEOUT_INTERVAL = {1, 0}; // 1 seconds
+constexpr timeval TIMEOUT_INTERVAL = {3, 0}; // 3 seconds
 
 struct Arguments {
     const char *ASport = DEFAULT_PORT;
@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
     }
 
     tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+    setsockopt(tcp_fd, SOL_SOCKET, SO_RCVTIMEO, &TIMEOUT_INTERVAL, 0);
     if (tcp_fd == -1) {
         cerr << "Error creating socket." << endl;
         cerr << "Error: " << strerror(errno) << endl;
@@ -110,9 +111,8 @@ int main(int argc, char *argv[]) {
     cout << "Server listening on port " << args.ASport << endl;
     while (1) {
         testfds = inputs; // Reload mask
-        timeout = TIMEOUT_INTERVAL;
 
-        int out_fds = select(FD_SETSIZE, &testfds, NULL, NULL, &timeout);
+        int out_fds = select(FD_SETSIZE, &testfds, NULL, NULL, NULL);
 
         switch (out_fds) {
         case 0:

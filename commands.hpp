@@ -104,6 +104,7 @@ optional<Response> send_udp_command(const string &command, Connections conns,
 optional<Response> send_tcp_command(const string &command, Connections conns,
                                     const string &type) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &TIMEOUT, 0);
     if (fd == -1)
         exit(1);
 

@@ -10,6 +10,8 @@
 
 using namespace std;
 
+const timeval TIMEOUT = {3, 0}; // 3 seconds
+
 struct UDPConnection {
     int fd;
     struct addrinfo *addr;
@@ -49,8 +51,14 @@ UDPConnection init_udp_connection(addrinfo hints, const char *IP,
                                   const char *port) {
     UDPConnection udp{};
     udp.fd = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol);
-    if (udp.fd == -1)
+    if (udp.fd == -1) {
+        cerr << "Error creating socket." << endl;
         exit(1);
+    }
+    if (setsockopt(udp.fd, SOL_SOCKET, SO_RCVTIMEO, &TIMEOUT, sizeof(TIMEOUT)) < 0) {
+        perror("Error");
+        exit(1);
+    }
 
     int errcode = getaddrinfo(IP, port, &hints, &(udp.addr));
     if (errcode != 0) {
@@ -62,6 +70,7 @@ UDPConnection init_udp_connection(addrinfo hints, const char *IP,
 
 int init_tcp_connection(Connections conns) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &TIMEOUT, 0);
     if (fd == -1) {
         cerr << "Error creating socket." << endl;
         cerr << "Error: " << strerror(errno) << endl;
