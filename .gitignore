@@ -1,5 +1,5 @@
-client
-server
+user
+AS
 database.json
 tests/*.html
 history.txt

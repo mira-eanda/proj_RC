@@ -3,13 +3,13 @@ CFLAGS  = -g -std=c++2a
 
 default: all
 
-all: client server
+all: user AS
 
-client: client.cpp commands.hpp common.hpp
-	$(CC) $(CFLAGS) -o client client.cpp
+user: client.cpp commands.hpp common.hpp
+	$(CC) $(CFLAGS) -o user client.cpp
 
-server: server.cpp common.hpp database.hpp	server_commands.hpp
-	$(CC) $(CFLAGS) -o server server.cpp
+AS: server.cpp common.hpp database.hpp	server_commands.hpp
+	$(CC) $(CFLAGS) -o AS server.cpp
 
 clean:
-	$(RM) client server
+	$(RM) user AS
