@@ -99,17 +99,16 @@ bool check_auction_ended(const Auction &auction) {
     auto now = chrono::system_clock::now();
     auto now_time_t = chrono::system_clock::to_time_t(now);
 
-    struct tm *tm_utc = std::gmtime(&now_time_t);
     // auction start time
     struct tm tm_start;
     istringstream iss(auction.start_date_time);
     iss >> get_time(&tm_start, "%Y-%m-%d %H:%M:%S");
-    auto start_time_t = mktime(&tm_start);
+    auto start_time_t = timegm(&tm_start);
 
     // expected end time
     auto end_time_t = start_time_t + auction.timeactive;
 
-    return now_time_t > end_time_t;
+    return now_time_t >= end_time_t;
 }
 
 int get_end_sec_time(const string &start, const string &end) {
